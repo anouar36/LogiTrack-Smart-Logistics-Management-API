@@ -6,6 +6,7 @@ import com.logitrack.logitrack.dto.ResClientDTO;
 import com.logitrack.logitrack.dto.User.UserResponseDTO;
 import com.logitrack.logitrack.entity.Client;
 import com.logitrack.logitrack.entity.User;
+import com.logitrack.logitrack.exception.UserAlreadyExistsException;
 import com.logitrack.logitrack.mapper.LoginRequestMapper;
 import com.logitrack.logitrack.repository.ClientRepository;
 import com.logitrack.logitrack.repository.UserRepository;
@@ -30,9 +31,14 @@ public class AuthService {
 
         User user = loginRequestMapper.toEntity(loginRequest);
         return userRepository.existsByEmailAndPasswordHash(user.getEmail(), user.getPasswordHash());
+
     }
 
     public ResClientDTO register(RegisterDto dto){
+        boolean userExists = userRepository.existsByEmail(dto.getEmail());
+        if(userExists){
+            throw new UserAlreadyExistsException("Email already exists");
+        }
         User user = User.builder()
                 .email(dto.getEmail())
                 .passwordHash(dto.getPasswordHash())
