@@ -10,12 +10,13 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 @Data
 @AllArgsConstructor
-@Component
+@NoArgsConstructor
 public class RegisterDto {
     @NotBlank
     private String name;

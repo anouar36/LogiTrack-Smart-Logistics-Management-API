@@ -7,22 +7,23 @@ import com.logitrack.logitrack.entity.User;
 import com.logitrack.logitrack.service.AuthService;
 import jakarta.validation.Valid;
 import jdk.jfr.Registered;
+import lombok.AllArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/auth")
+@AllArgsConstructor
 public class AuthController {
 
-    private AuthService authService;
+    private final AuthService authService;   // <-- لازم final
 
-    //login
     @PostMapping("/login")
-    public User login(LoginRequest loginRequest){
+    public User login(@RequestBody LoginRequest loginRequest){
         return authService.login(loginRequest);
     }
+
     @PostMapping("/register")
     public ResClientDTO register(@RequestBody @Valid RegisterDto dto){
         return authService.register(dto);
     }
-
 }

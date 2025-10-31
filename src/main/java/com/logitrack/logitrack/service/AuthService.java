@@ -33,21 +33,24 @@ public class AuthService {
     }
 
     public ResClientDTO register(RegisterDto dto){
-        User user = User.builder().email(dto.getEmail()).passwordHash(dto.getPasswordHash()).active(true).build();
+        User user = User.builder()
+                .email(dto.getEmail())
+                .passwordHash(dto.getPasswordHash())
+                .active(true)
+                .build();
+
         userRepository.save(user);
-        Client client = Client.builder().name(dto.getName()).user(user).build();
+
+        Client client = Client.builder()
+                .name(dto.getName())
+                .user(user)
+                .build();
+
         clientRepository.save(client);
-        UserResponseDTO userDTO = modelMapper.map(user, UserResponseDTO.class);
-        ResClientDTO resClientDTO = new ResClientDTO(client.getId(), client.getName(), userDTO);
-        return resClientDTO;
 
+        UserResponseDTO userDTO = new UserResponseDTO(user.getEmail(), user.getPasswordHash(), user.isActive());
 
-
-
-
-
-
+        return new ResClientDTO(client.getId(), client.getName(), userDTO);
     }
-
 
 }
