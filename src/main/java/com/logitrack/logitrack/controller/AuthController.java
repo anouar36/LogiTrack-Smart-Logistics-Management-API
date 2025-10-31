@@ -24,5 +24,5 @@ public class AuthController {
     public ResClientDTO register(@RequestBody @Valid RegisterDto dto){
         return authService.register(dto);
     }
-    //logout boolean logout()
+
 }
