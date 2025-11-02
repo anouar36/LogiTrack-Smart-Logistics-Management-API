@@ -8,6 +8,7 @@ import com.logitrack.logitrack.entity.InventoryMovement;
 import com.logitrack.logitrack.entity.Product;
 import com.logitrack.logitrack.entity.enums.MovementType;
 import com.logitrack.logitrack.exception.ProductNotExistsException;
+import com.logitrack.logitrack.mapper.InventoryMapper;
 import com.logitrack.logitrack.mapper.InventoryMovementMapper;
 import com.logitrack.logitrack.repository.InventoryMovementRepository;
 import com.logitrack.logitrack.repository.ProductRepository;
@@ -27,23 +28,20 @@ public class InventoryMovementService {
     private final InventoryMovementRepository inventoryMovementRepository;
     private final InventoryMovementMapper inventoryMovementMapper;
     private final  InventoryService inventoryService;
+    private final InventoryMapper inventoryMapper;
 
 
     @Transactional
     public InventoryMovementRespenceDTO addInventoryMovement(InventoryMovementRequestDTO dto) {
 
         Product product = productRepository.findById(dto.getIdProduc())
-                .orElseThrow(() -> new ProductNotExistsException("هذا المنتج غير موجود"));
+                .orElseThrow(() -> new ProductNotExistsException("This product does not exist"));
 
         if (dto.getQuantity() <= 0) {
-            throw new IllegalArgumentException("الكمية يجب أن تكون أكبر من صفر");
+            throw new IllegalArgumentException("Quantity must be greater than zero");
         }
 
-        // 3️⃣ تحديث المخزون
-        RequestAddQtyOnHandDto addQtyDto = new RequestAddQtyOnHandDto();
-        addQtyDto.setProductId(dto.getIdProduc());
-        addQtyDto.setWarehouseId(dto.getIdWarehouse());
-        addQtyDto.setQuantityOnHand(dto.getQuantity());
+        RequestAddQtyOnHandDto addQtyDto = inventoryMapper.toAddQtyOnHandDto(dto);
 
         Inventory updatedInventory = inventoryService.addQtyOnHand(addQtyDto);
 
