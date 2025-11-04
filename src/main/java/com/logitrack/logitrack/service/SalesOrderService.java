@@ -45,16 +45,18 @@ public class SalesOrderService {
         salesOrder.setStatus(SOStatus.CREATED);
 
 
-        //initializr varible total Price of Sales order 0.00
+     //initializr varible total Price of Sales order 0.00
         BigDecimal totalPriceOrder = BigDecimal.ZERO;
 
         //fix my entity Sales Order Line for checked product and totle price of product
         List<SalesOrderLine> linesToSave = new ArrayList<>();
-        for (SalesOrderLine lineFromRequest : dto.getLines()) {
+        List<String> backOrderProducts = new ArrayList<>();
 
+        for (SalesOrderLine lineFromRequest : dto.getLines()) {
             // this for check if this product we have a quantity in repository
             Long productId = lineFromRequest.getProduct().getId();
             Long remainingQuantityToReserve = 0L ;
+
             //check desponbelety of this producte
             List<AllocationDto> allocationDto = inventoryService.reserveProduct(productId,lineFromRequest.getQuantity());
             if(allocationDto != null){
@@ -63,6 +65,14 @@ public class SalesOrderService {
                         .sum();
 
                 remainingQuantityToReserve = lineFromRequest.getQuantity() - totalQuantityTaken ;
+
+
+                if (remainingQuantityToReserve == lineFromRequest.getQuantity()) {
+                    throw new RuntimeException(
+                            "Product " + lineFromRequest.getProduct().getName() + " has no available stock."
+                    );
+                }
+
             }
 
 
@@ -84,7 +94,15 @@ public class SalesOrderService {
 
             linesToSave.add(line);
             totalPriceOrder = totalPriceOrder.add(totalPrice);
+
+            if (line.getRemainingQuantityToReserve() > 0 && line.getRemainingQuantityToReserve() < lineFromRequest.getQuantity()) {
+                backOrderProducts.add(
+                        line.getProduct().getName()
+                                + " (Missing: " + line.getRemainingQuantityToReserve() + ")"
+                );
+            }
         }
+
 
         //this for save sales order
         salesOrder = salesOrderRepository.save(salesOrder);
@@ -99,8 +117,16 @@ public class SalesOrderService {
 
         Client client = clientService.getClientById(salesOrder.getClient().getId());
 
+        //message
+        String backOrderMessage = null;
+        if (!backOrderProducts.isEmpty()) {
+            backOrderMessage = "Some products could not be fully reserved: "
+                    + String.join(", ", backOrderProducts);
+        }
+
         //this for return dto data
         ResponceSalesOrderDto response = ResponceSalesOrderDto.builder()
+                .message(backOrderMessage)
                 .clientId(client.getId())
                 .clientName(client.getName())
                 .ClientEmail(client.getUser().getEmail())

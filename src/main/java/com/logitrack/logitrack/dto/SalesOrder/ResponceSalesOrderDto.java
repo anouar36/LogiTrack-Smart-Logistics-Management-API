@@ -22,6 +22,7 @@ import java.util.List;
 @Data
 @Builder
 public class ResponceSalesOrderDto {
+    private String message;
     private SOStatus status;
     private LocalDateTime createdAt = LocalDateTime.now();
     private Long clientId;
