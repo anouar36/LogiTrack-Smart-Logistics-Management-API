@@ -1,6 +1,7 @@
 package com.logitrack.logitrack.service;
 
 import com.logitrack.logitrack.dto.AllocationDto;
+import com.logitrack.logitrack.dto.Product.AddProductToOrderRequest;
 import com.logitrack.logitrack.dto.SalesOrder.*;
 import com.logitrack.logitrack.dto.SalesOrder.DesplayAllOrdersLineDto;
 import com.logitrack.logitrack.entity.*;
@@ -138,6 +139,100 @@ public class SalesOrderService {
 
         return response;
     }
+
+    // SalesOrderService.java
+
+    @Transactional
+    public ResponceSalesOrderDto addProductsToOrder(Long orderId, List<AddProductToOrderRequest> productsToAdd) {
+
+        // 1️⃣ جلب الطلبية (مرة واحدة)
+        SalesOrder order = salesOrderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found with id " + orderId));
+
+        List<String> successMessages = new ArrayList<>();
+
+        // (ModelMapper ضروري يكون @Autowired في السيرفيس ديالك)
+        // @Autowired
+        // private ModelMapper modelMapper;
+
+        // 2️⃣ غندورو بـ loop على كل منتج باغي يتزاد
+        for (AddProductToOrderRequest productDto : productsToAdd) {
+
+            // 3️⃣ جلب المنتج الحالي
+            Product product = productService.getProductById(productDto.getProductId())
+                    .orElseThrow(() -> new RuntimeException("Product not found with id " + productDto.getProductId()));
+
+            if (!product.isActive()) {
+                // إلا كان منتج واحد ما خدامش، نوقفو العملية كاملة
+                throw new RuntimeException("Product '" + product.getName() + "' is inactive and cannot be added.");
+            }
+
+            // 4️⃣ تحقق من الستوك (Inventory) للمنتج الحالي
+            List<AllocationDto> allocation = inventoryService.reserveProduct(product.getId(), productDto.getQuantity());
+            long totalReserved = allocation.stream().mapToLong(AllocationDto::getAllocatedQuantity).sum();
+            long remainingToReserve = productDto.getQuantity() - totalReserved;
+
+
+            //  👇👇👇  هذا هو التعديل لي درنا  👇👇👇
+            if (totalReserved == 0) {
+                // دابا غنوقفو العملية كاملة وغترجع Error
+                throw new RuntimeException("Product '" + product.getName() + "' has no available stock.");
+            }
+            //  👆👆👆  نهاية التعديل  👆👆👆
+
+
+            // 5️⃣ إنشاء الرسالة (Message)
+            if (remainingToReserve > 0) {
+                successMessages.add("Backorder: " + remainingToReserve + " units of " + product.getName());
+            } else {
+                successMessages.add("Product '" + product.getName() + "' added.");
+            }
+
+            // 6️⃣ احسب الثمن الكلي للمنتج الحالي
+            BigDecimal totalPrice = BigDecimal.valueOf(productDto.getQuantity())
+                    .multiply(product.getPrice());
+
+            // 7️⃣ إنشاء SalesOrderLine
+            SalesOrderLine line = SalesOrderLine.builder()
+                    .product(product)
+                    .salesOrder(order)
+                    .quantity(productDto.getQuantity())
+                    .unitPrice(product.getPrice())
+                    .totalPrice(totalPrice)
+                    .remainingQuantityToReserve(remainingToReserve)
+                    .build();
+
+            // 8️⃣ زيد الـ line
+            salesOrderLineService.addOrderLine(line);
+            order.getLines().add(line);
+        }
+
+        // 9️⃣ تحديث الـ order (مرة واحدة في الأخير)
+        salesOrderRepository.save(order);
+
+        // 10️⃣ رجع JSON response (هاد الكود غيخدم غير إلا كلشي داز مزيان)
+        BigDecimal finalTotalPrice = order.getLines().stream()
+                .map(SalesOrderLine::getTotalPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        String finalMessage = String.join(", ", successMessages);
+
+        ResponceSalesOrderDto response = ResponceSalesOrderDto.builder()
+                .clientId(order.getClient().getId())
+                .clientName(order.getClient().getName())
+                .ClientEmail(order.getClient().getUser().getEmail())
+                .status(order.getStatus())
+                .createdAt(order.getCreatedAt())
+                .lines(order.getLines().stream()
+                        .map(line -> modelMapper.map(line, ResponseSalesOrderLineDto.class))
+                        .toList())
+                .totalPrice(finalTotalPrice)
+                .message(finalMessage.trim())
+                .build();
+
+        return response;
+    }
+
     public SalesOrderDto getSalesOrderByIdForClient(Long clientId, Long orderId) {
         // Find the order and ensure it belongs to the client
         SalesOrder order = salesOrderRepository.findById(orderId)
