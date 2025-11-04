@@ -1,18 +1,21 @@
 package com.logitrack.logitrack.dto.Product;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
-import org.springframework.stereotype.Component;
-
+import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 
-
 @Data
-@Component
-public class ResponseDTO {
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class ProductDto {
     private Long id;
     private String sku;
     private String name;
     private String category;
     private BigDecimal price;
-    private String message;
+    private Boolean active;
+    private Boolean deleted;
 }

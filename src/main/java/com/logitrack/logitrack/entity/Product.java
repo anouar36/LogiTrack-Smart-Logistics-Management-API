@@ -3,6 +3,8 @@ package com.logitrack.logitrack.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
+
 @Entity
 @Data
 @NoArgsConstructor
@@ -19,7 +21,7 @@ public class Product {
 
     private String category;
 
-    private Double price;
+    private BigDecimal price;
 
     @Column(nullable = false)
     private boolean active = true;

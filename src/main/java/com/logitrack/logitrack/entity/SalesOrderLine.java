@@ -1,5 +1,6 @@
 package com.logitrack.logitrack.entity;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
@@ -15,13 +16,16 @@ public class SalesOrderLine {
     private Long id;
     
     private Long quantity;
+    private BigDecimal totalPrice;
     private BigDecimal unitPrice;
     
     @ManyToOne
     @JoinColumn(name = "sales_order_id")
+    @JsonBackReference
     private SalesOrder salesOrder;
     
     @ManyToOne
     @JoinColumn(name = "product_id")
     private Product product;
+    private Long remainingQuantityToReserve;
 }

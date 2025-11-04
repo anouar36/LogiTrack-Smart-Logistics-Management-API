@@ -1,5 +1,6 @@
 package com.logitrack.logitrack.entity;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
 import java.util.List;
@@ -21,5 +22,6 @@ public class Client {
 
     
     @OneToMany(mappedBy = "client", cascade = CascadeType.ALL)
+    @JsonManagedReference
     private List<SalesOrder> salesOrders;
 }
