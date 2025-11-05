@@ -26,6 +26,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     void deleteAll();
 
     List<Product> findByDeletedFalse(  );
+    Optional<Product> findBySku(String sku);
 
 
 }

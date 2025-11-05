@@ -1,5 +1,6 @@
 package com.logitrack.logitrack.controller;
 
+import com.logitrack.logitrack.dto.Product.ProductAvailabilityDto;
 import com.logitrack.logitrack.dto.Product.RequestDTO;
 import com.logitrack.logitrack.dto.Product.ResponseDTO;
 import com.logitrack.logitrack.entity.Product;
@@ -153,5 +154,14 @@ public class ProductController {
     @GetMapping("/count")
     public ResponseEntity<Long> countProducts() {
         return ResponseEntity.ok(productService.countProducts());
+    }
+
+    @GetMapping("/sku/{sku}")
+    public ResponseEntity<ProductAvailabilityDto> getProductAvailabilityBySku(@PathVariable String sku) {
+
+        ProductAvailabilityDto dto = productService.checkProductAvailabilityBySku(sku);
+        return ResponseEntity.ok(dto);
+
+
     }
 }

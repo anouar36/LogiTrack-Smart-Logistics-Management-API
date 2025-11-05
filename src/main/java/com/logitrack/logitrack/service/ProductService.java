@@ -1,5 +1,6 @@
 package com.logitrack.logitrack.service;
 
+import com.logitrack.logitrack.dto.Product.ProductAvailabilityDto;
 import com.logitrack.logitrack.dto.Product.RequestDTO;
 import com.logitrack.logitrack.dto.Product.ResponseDTO;
 import com.logitrack.logitrack.entity.Product;
@@ -117,6 +118,42 @@ public class ProductService {
 
     public List<Product> getAllActiveProducts() {
         return productRepository.findByDeletedFalse();
+    }
+
+    public ProductAvailabilityDto checkProductAvailabilityBySku(String sku) {
+
+        // 1. كنقلبو على المنتج بـ SKU
+        Optional<Product> productOpt = productRepository.findBySku(sku);
+
+        // 2. الحالة 0: المنتج ما كاينش أصلاً (SKU Inexistant)
+        if (productOpt.isEmpty()) {
+            // كنرميو Exception باش يرجع Error 404 (Not Found)
+            // (من الأحسن دير Custom Exception ديالك)
+            throw new RuntimeException("Produit non trouvé avec SKU: " + sku);
+        }
+
+        Product product = productOpt.get();
+
+        // 3. دابا غنطبقو الشروط ديالك
+        if (product.isActive()) {
+            // ✅ الحالة 1: (Given un SKU existant [et actif])
+            return ProductAvailabilityDto.builder()
+                    .sku(product.getSku())
+                    .name(product.getName())
+                    .category(product.getCategory())
+                    .available(true)
+                    .message("Produit disponible à la vente.")
+                    .build();
+        } else {
+            // ❌ الحالة 2: (Given un SKU inactif)
+            return ProductAvailabilityDto.builder()
+                    .sku(product.getSku())
+                    .name(product.getName()) // كنرجعو السمية وخا هو inactif
+                    .category(product.getCategory())
+                    .available(false)
+                    .message("Ce produit est inactif et n'est pas disponible à la vente.")
+                    .build();
+        }
     }
 
 
