@@ -1,4 +1,4 @@
 package com.logitrack.logitrack.repository;
 
-public interface SalesOrderLineRepository {
+public interface SupplierRepository {
 }
