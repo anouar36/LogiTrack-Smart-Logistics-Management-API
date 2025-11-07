@@ -1,10 +1,7 @@
 package com.logitrack.logitrack.controller;
 
 import com.logitrack.logitrack.dto.Product.AddProductToOrderRequest;
-import com.logitrack.logitrack.dto.SalesOrder.DesplayAllOrdersDto;
-import com.logitrack.logitrack.dto.SalesOrder.RequestSalesOrderDto;
-import com.logitrack.logitrack.dto.SalesOrder.ResponceSalesOrderDto;
-import com.logitrack.logitrack.dto.SalesOrder.SalesOrderLineDto;
+import com.logitrack.logitrack.dto.SalesOrder.*;
 import com.logitrack.logitrack.entity.Client;
 import com.logitrack.logitrack.entity.User;
 import com.logitrack.logitrack.service.SalesOrderService;
@@ -64,6 +61,12 @@ public class SalesOrderController {
 
         ResponceSalesOrderDto response = salesOrderService.addProductsToOrder(orderId, productsToAdd);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{orderId}/validate")
+    public ResponseEntity<ValidatedOrderDto> validateOrder(@PathVariable Long orderId) {
+        ValidatedOrderDto responseDto = salesOrderService.validateOrder(orderId);
+        return ResponseEntity.ok(responseDto);
     }
 
 

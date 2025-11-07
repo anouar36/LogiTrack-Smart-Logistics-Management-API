@@ -27,5 +27,6 @@ public class SalesOrderLine {
     @ManyToOne
     @JoinColumn(name = "product_id")
     private Product product;
-    private Long remainingQuantityToReserve;
+    @Builder.Default
+    private Long remainingQuantityToReserve = 0L;
 }

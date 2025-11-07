@@ -6,9 +6,11 @@ import com.logitrack.logitrack.dto.SalesOrder.*;
 import com.logitrack.logitrack.dto.SalesOrder.DesplayAllOrdersLineDto;
 import com.logitrack.logitrack.entity.*;
 import com.logitrack.logitrack.entity.enums.SOStatus;
+import com.logitrack.logitrack.exception.OrderValidationException;
 import com.logitrack.logitrack.exception.ProductNotExistsException;
 import com.logitrack.logitrack.exception.ResourceNotFoundException;
 import com.logitrack.logitrack.mapper.DesplayAllOrdersLineDtosMapper;
+import com.logitrack.logitrack.repository.SalesOrderLineRepository;
 import com.logitrack.logitrack.repository.SalesOrderRepository;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static io.micrometer.observation.transport.Kind.CLIENT;
 
@@ -33,6 +36,8 @@ public class SalesOrderService {
     private final ClientService clientService;
     private final InventoryService inventoryService;
     private final DesplayAllOrdersLineDtosMapper desplayAllOrdersLineDtosMapper;
+    private final SalesOrderLineRepository salesOrderLineRepository;
+
 
     @Transactional
     public ResponceSalesOrderDto salesOrder(RequestSalesOrderDto dto) {
@@ -145,83 +150,82 @@ public class SalesOrderService {
     @Transactional
     public ResponceSalesOrderDto addProductsToOrder(Long orderId, List<AddProductToOrderRequest> productsToAdd) {
 
-        // 1️⃣ جلب الطلبية (مرة واحدة)
         SalesOrder order = salesOrderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Order not found with id " + orderId));
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id " + orderId));
 
         List<String> successMessages = new ArrayList<>();
+        List<String> backorderMessages = new ArrayList<>();
 
-        // (ModelMapper ضروري يكون @Autowired في السيرفيس ديالك)
-        // @Autowired
-        // private ModelMapper modelMapper;
+        // (تأكد أن عندك ModelMapper معرف)
+        // @Autowired private ModelMapper modelMapper;
 
-        // 2️⃣ غندورو بـ loop على كل منتج باغي يتزاد
         for (AddProductToOrderRequest productDto : productsToAdd) {
 
-            // 3️⃣ جلب المنتج الحالي
             Product product = productService.getProductById(productDto.getProductId())
-                    .orElseThrow(() -> new RuntimeException("Product not found with id " + productDto.getProductId()));
+                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productDto.getProductId()));
 
             if (!product.isActive()) {
-                // إلا كان منتج واحد ما خدامش، نوقفو العملية كاملة
-                throw new RuntimeException("Product '" + product.getName() + "' is inactive and cannot be added.");
+                backorderMessages.add("Product '" + product.getName() + "' is inactive and was skipped.");
+                continue;
             }
 
-            // 4️⃣ تحقق من الستوك (Inventory) للمنتج الحالي
-            List<AllocationDto> allocation = inventoryService.reserveProduct(product.getId(), productDto.getQuantity());
-            long totalReserved = allocation.stream().mapToLong(AllocationDto::getAllocatedQuantity).sum();
-            long remainingToReserve = productDto.getQuantity() - totalReserved;
+            // 4️⃣  👇👇  هنا كاين التعديل الكبير  👇👇
+            // ما بقيناش كنحسبو الستوك هنا، ولينا كنعيطو نيشان للمحرك
 
+            Long quantityNeeded = productDto.getQuantity();
+            List<AllocationDto> allocations = inventoryService.reserveProduct(product.getId(), quantityNeeded);
 
-            //  👇👇👇  هذا هو التعديل لي درنا  👇👇👇
-            if (totalReserved == 0) {
-                // دابا غنوقفو العملية كاملة وغترجع Error
-                throw new RuntimeException("Product '" + product.getName() + "' has no available stock.");
-            }
-            //  👆👆👆  نهاية التعديل  👆👆👆
+            // 4a. حساب شحال تحجز بصح
+            long totalReservedNow = allocations.stream()
+                    .mapToLong(AllocationDto::getAllocatedQuantity)
+                    .sum();
 
+            // 4b. حساب شحال باقي ناقص (Backorder)
+            long remainingToReserve = quantityNeeded - totalReservedNow;
 
-            // 5️⃣ إنشاء الرسالة (Message)
+            // 4c. إنشاء الرسالة
             if (remainingToReserve > 0) {
-                successMessages.add("Backorder: " + remainingToReserve + " units of " + product.getName());
+                backorderMessages.add("Backorder: " + remainingToReserve + " units of " + product.getName());
             } else {
-                successMessages.add("Product '" + product.getName() + "' added.");
+                successMessages.add("Product '" + product.getName() + "' added and reserved.");
             }
+            // 👆👆  نهاية التعديل  👆👆
 
-            // 6️⃣ احسب الثمن الكلي للمنتج الحالي
-            BigDecimal totalPrice = BigDecimal.valueOf(productDto.getQuantity())
-                    .multiply(product.getPrice());
 
-            // 7️⃣ إنشاء SalesOrderLine
+            // 5️⃣ احسب الثمن الكلي
+            BigDecimal totalPrice = BigDecimal.valueOf(quantityNeeded)
+                    .multiply(product.getPrice()); // (من الأحسن الثمن يكون فـ DTO)
+
+            // 6️⃣ إنشاء SalesOrderLine
             SalesOrderLine line = SalesOrderLine.builder()
                     .product(product)
                     .salesOrder(order)
-                    .quantity(productDto.getQuantity())
-                    .unitPrice(product.getPrice())
+                    .quantity(quantityNeeded)
+                    .unitPrice(product.getPrice()) // (أو من DTO)
                     .totalPrice(totalPrice)
-                    .remainingQuantityToReserve(remainingToReserve)
+                    .remainingQuantityToReserve(remainingToReserve) // 👈  كنسجلو النقص لي تحسب
                     .build();
 
-            // 8️⃣ زيد الـ line
-            salesOrderLineService.addOrderLine(line);
+            // 7️⃣ زيد الـ line
+            salesOrderLineRepository.save(line);
             order.getLines().add(line);
         }
 
-        // 9️⃣ تحديث الـ order (مرة واحدة في الأخير)
+        // 8️⃣ تحديث الـ order
         salesOrderRepository.save(order);
 
-        // 10️⃣ رجع JSON response (هاد الكود غيخدم غير إلا كلشي داز مزيان)
+        // 9️⃣ رجع JSON response
         BigDecimal finalTotalPrice = order.getLines().stream()
                 .map(SalesOrderLine::getTotalPrice)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        String finalMessage = String.join(", ", successMessages);
+        String finalMessage = String.join(", ", successMessages) + " " + String.join(", ", backorderMessages);
 
         ResponceSalesOrderDto response = ResponceSalesOrderDto.builder()
                 .clientId(order.getClient().getId())
                 .clientName(order.getClient().getName())
                 .ClientEmail(order.getClient().getUser().getEmail())
-                .status(order.getStatus())
+                .status(order.getStatus()) // (غتكون CREATED)
                 .createdAt(order.getCreatedAt())
                 .lines(order.getLines().stream()
                         .map(line -> modelMapper.map(line, ResponseSalesOrderLineDto.class))
@@ -279,5 +283,76 @@ public class SalesOrderService {
         }
         return desplayAllOrdersDto;
 
+    }
+    // SalesOrderService.java
+
+    @Transactional
+    public ValidatedOrderDto validateOrder(Long orderId) {
+
+        // 1️⃣ جلب الطلبية (مع السطور والمنتجات)
+        SalesOrder order = salesOrderRepository.findByIdWithLinesAndProducts(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
+
+        // 2️⃣ التحقق من الحالة
+        if (order.getStatus() != SOStatus.CREATED) {
+            throw new OrderValidationException("Order is not in CREATED status. Current status: " + order.getStatus());
+        }
+
+        // 3️⃣ التحقق من الـ Null (كنخليوه للأمان)
+        boolean hasNullLines = order.getLines().stream()
+                .anyMatch(line -> line.getRemainingQuantityToReserve() == null);
+
+        if (hasNullLines) {
+            throw new OrderValidationException("Cannot validate order " + orderId + ". One or more lines have unprocessed quantity (null).");
+        }
+
+        // 4️⃣ 👇👇  اللوجيك الجديد: محاولة حجز النقص (Backorders) 👇👇
+
+        // ليسته باش نجمعو الأخطاء الجداد
+        List<String> newBackorderMessages = new ArrayList<>();
+
+        // غندورو على كاع السطور لي فيهم نقص
+        for (SalesOrderLine line : order.getLines()) {
+
+            if (line.getRemainingQuantityToReserve() > 0) {
+                // هاد السطر فيه نقص، غنحاولو نحجزوه دابا
+
+                Long quantityToReserve = line.getRemainingQuantityToReserve();
+
+                // 4a. العيطة لسيرفيس الستوك
+                List<AllocationDto> allocation = inventoryService.reserveProduct(line.getProduct().getId(), quantityToReserve);
+                long totalReserved = allocation.stream().mapToLong(AllocationDto::getAllocatedQuantity).sum();
+
+                // 4b. تحديث السطر (Line)
+                long newRemaining = quantityToReserve - totalReserved;
+                line.setRemainingQuantityToReserve(newRemaining);
+                salesOrderLineRepository.save(line); // كنسجلو التحديث ديال السطر
+
+                // 4c. إلا باقي النقص، كنسجلو رسالة خطأ
+                if (newRemaining > 0) {
+                    newBackorderMessages.add("Product '" + line.getProduct().getName() + "' still has " + newRemaining + " units on backorder.");
+                }
+            }
+        }
+        // 👆👆 نهاية اللوجيك الجديد 👆👆
+
+
+        // 5️⃣ القرار (Decision) - دابا غنشوفو واش باقي شي نقص
+        if (!newBackorderMessages.isEmpty()) {
+            // ❌ خطأ: فشلت محاولة الحجز، باقي النقص
+            String errorMessages = String.join(", ", newBackorderMessages);
+            throw new OrderValidationException("Cannot validate order. Stock is still insufficient: " + errorMessages);
+        }
+
+        // 6️⃣ ✅ نجاح: كلشي تحجز
+        order.setStatus(SOStatus.RESERVED);
+        salesOrderRepository.save(order);
+
+        // 7️⃣ رجع جواب ناجح
+        return ValidatedOrderDto.builder()
+                .orderId(order.getId())
+                .newStatus(order.getStatus())
+                .message("Order validated successfully. All items reserved.")
+                .build();
     }
 }
