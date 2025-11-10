@@ -6,6 +6,7 @@ import com.logitrack.logitrack.entity.enums.POStatus;
 import com.logitrack.logitrack.exception.BusinessException;
 import com.logitrack.logitrack.exception.ResourceNotFoundException;
 import com.logitrack.logitrack.repository.*;
+import lombok.AllArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -16,67 +17,63 @@ import java.util.ArrayList;
 import java.util.stream.Collectors;
 
 @Service
+@AllArgsConstructor
 public class PurchaseOrderService {
 
-    @Autowired
-    private PurchaseOrderRepository purchaseOrderRepository;
-    @Autowired
-    private SupplierRepository supplierRepository;
-    @Autowired
-    private ProductRepository productRepository;
-    @Autowired
-    private ModelMapper modelMapper; // (أو MapStruct كيفما طلبتي)
-    @Autowired
-    private WarehouseRepository warehouseRepository;
-    @Autowired
-    private InventoryService inventoryService;
-    @Autowired
-    private PurchaseOrderLineRepository poLineRepository;
+    private final PurchaseOrderRepository purchaseOrderRepository;
+    private final SupplierRepository supplierRepository;
+    private final ProductRepository productRepository;
+    private final ModelMapper modelMapper;
+    private final WarehouseRepository warehouseRepository;
+    private final InventoryService inventoryService;
+    private final PurchaseOrderLineRepository poLineRepository;
 
     @Transactional
     public PurchaseOrderResponseDto createPurchaseOrder(CreatePurchaseOrderRequestDto request) {
 
-        // 1. جلب المورد (Supplier)
+        // 1 get suplyer by id for check if this supley is founde or not
         Supplier supplier = supplierRepository.findById(request.getSupplierId())
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier not found with id: " + request.getSupplierId()));
 
-        // 2. إنشاء الطلبية (Header)
+        // creat PurchaseOrder
         PurchaseOrder po = PurchaseOrder.builder()
                 .supplier(supplier)
                 .status(POStatus.DRAFT)
-                .createdAt(Instant.now()) // 👈  تعديل: كنستعملو Instant
+                .createdAt(Instant.now())
                 .lines(new ArrayList<>())
                 .build();
 
-        // 3. لوب (Loop) على السطور
+        // loopp for all PurchaseOrderlinr for created lin by lin with this PurchaseOrder
         for (PurchaseOrderLineRequestDto lineDto : request.getLines()) {
 
+            // get product for by id
             Product product = productRepository.findById(lineDto.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + lineDto.getProductId()));
 
+            // check statude of this priduct if his active or not
             if (!product.isActive()) {
                 throw new BusinessException("Product '" + product.getName() + "' is inactive and cannot be purchased.");
             }
 
-            // 3c. إنشاء السطر (Line)
+            // create new line for this PurchaseOrder
             PurchaseOrderLine poLine = PurchaseOrderLine.builder()
                     .product(product)
                     .quantity(lineDto.getQuantity())
-                    .unitPrice(lineDto.getUnitPrice()) // 👈  تعديل: زدنا ثمن الوحدة
+                    .unitPrice(lineDto.getUnitPrice())
                     .purchaseOrder(po)
                     .build();
 
+            // save this PurchaseOrderline to arryList
             po.getLines().add(poLine);
         }
 
-        // 4. حفظ الطلبية (مع السطور بفضل CascadeType.ALL لي عندك)
-        PurchaseOrder savedPo = purchaseOrderRepository.save(po);
 
-        // 5. تحويل الجواب لـ DTO
+        // save array lis of PurchaseOrderline
+        PurchaseOrder savedPo = purchaseOrderRepository.save(po);
         return mapToDto(savedPo);
     }
 
-    // --- ميتود مساعدة للتحويل (Mapping) ---
+    // mapper fot respense Dto
     private PurchaseOrderResponseDto mapToDto(PurchaseOrder po) {
         PurchaseOrderResponseDto dto = modelMapper.map(po, PurchaseOrderResponseDto.class);
         dto.setSupplierId(po.getSupplier().getId());
@@ -95,61 +92,60 @@ public class PurchaseOrderService {
     @Transactional
     public PurchaseOrderResponseDto approvePurchaseOrder(Long poId) {
 
-        // 1. جلب طلب الشراء (PO)
+        // GET PurchaseOrder by id
         PurchaseOrder po = purchaseOrderRepository.findById(poId)
                 .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found with id: " + poId));
 
-        // 2. التحقق من الحالة (كنستعمل DRAFT بناءً على الصورة ديالك)
+        // check if this PurchaseOrder his have status approved at admin or not
         if (po.getStatus() != POStatus.DRAFT) {
             throw new BusinessException("Only POs in DRAFT status can be approved. Current status: " + po.getStatus());
         }
 
-        // 3. الموافقة (Approve)
+        // change status of this purchaseOrder after check his status draft
         po.setStatus(POStatus.APPROVED);
         PurchaseOrder savedPo = purchaseOrderRepository.save(po);
 
-        // 4. رجع الجواب (DTO)
-        return mapToDto(savedPo); // (استعمل الـ Mapper لي صاوبنا قبيلة)
+        return mapToDto(savedPo);
     }
-
-    // ... (الميتود "mapToDto" لي صاوبنا قبيلة) ...
-
-
 
     @Transactional
     public void receiveFullPurchaseOrder(Long poId, Long warehouseId) {
 
-        // 1. جلب الطلبية (PO) بالسطور والمنتجات ديالها
+
+        // get PurchaseOrder By PurchaseOrderId
         PurchaseOrder po = purchaseOrderRepository.findByIdWithLinesAndProducts(poId)
                 .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found with id: " + poId));
 
+        // find warehouse By Id
         Warehouse warehouse = warehouseRepository.findById(warehouseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse not found with id: " + warehouseId));
 
+        // check status becouse don't receive just if APPROVED at admin
         if (po.getStatus() != POStatus.APPROVED) {
             throw new BusinessException("Cannot receive stock for a PO that is not APPROVED. Current status: " + po.getStatus());
         }
 
-        // 2. لوب (Loop) على السطور "الحقيقية" ديال الـ PO
+        // loop for all PurchaseOrderLine
         for (PurchaseOrderLine poLine : po.getLines()) {
 
+            //catch product
             Product product = poLine.getProduct();
 
-            // 👇👇  هنا فين طبقنا الافتراض ديالك  👇👇
-            // كنفترضو أن الكمية لي وصلات هي الكمية لي طلبنا
+           //catch Quantity of this product in PurchaseOrder
             Long quantityReceived = poLine.getQuantity();
 
+            //if Quantity of this product == 0 or null goo to nexte product
             if (quantityReceived == null || quantityReceived <= 0) {
-                continue; // كنتجاهلو السطور لي مافيهمش كمية
+                continue;
             }
 
-            // 3. ✨✨  كنعيطو للـ InventoryService بنفس اللوجيك القديم ✨✨
-            // هو غيزيد الستوك ويقلب على الطلبيات (SO) أوتوماتيكيا
+
+            // calla function for serch all SO his Backorders for gived his Quantity of his order
             inventoryService.receiveStockAndFulfillBackorders(product, warehouse, quantityReceived);
         }
 
-        // 4. تبديل الحالة لـ "تم الاستلام"
-        po.setStatus(POStatus.RECEIVED); // دابا غندوزو نيشان لـ RECEIVED
+        // after all this change status of this PurchaseOrder to RECEIVED
+        po.setStatus(POStatus.RECEIVED);
         purchaseOrderRepository.save(po);
     }
 }

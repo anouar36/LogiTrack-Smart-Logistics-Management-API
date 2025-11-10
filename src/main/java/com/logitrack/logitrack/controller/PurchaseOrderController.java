@@ -31,10 +31,10 @@ public class PurchaseOrderController {
         PurchaseOrderResponseDto response = purchaseOrderService.approvePurchaseOrder(poId);
         return ResponseEntity.ok(response);
     }
-    @PostMapping("/{poId}/receive-full") // 👈  بدلت السمية باش تكون واضحة
+    @PostMapping("/{poId}/receive-full")
     public ResponseEntity<String> receiveFullPurchaseOrder(
             @PathVariable Long poId,
-            @Valid @RequestBody ReceiveFullPurchaseOrderDto request) { // 👈  استعملنا الـ DTO المبسط
+            @Valid @RequestBody ReceiveFullPurchaseOrderDto request) {
 
         purchaseOrderService.receiveFullPurchaseOrder(poId, request.getWarehouseId());
         return ResponseEntity.ok("Stock received successfully (Full) and backorders processed.");
