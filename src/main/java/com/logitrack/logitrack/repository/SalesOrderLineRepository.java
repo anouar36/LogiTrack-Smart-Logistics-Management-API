@@ -1,6 +1,8 @@
 package com.logitrack.logitrack.repository;
 
+import com.logitrack.logitrack.entity.Product;
 import com.logitrack.logitrack.entity.SalesOrderLine;
+import com.logitrack.logitrack.entity.enums.SOStatus;
 import org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -15,5 +17,8 @@ public interface SalesOrderLineRepository extends JpaRepository<SalesOrderLine, 
             "AND sol.salesOrder.status = 'CREATED' " +
             "ORDER BY sol.salesOrder.createdAt ASC")
     List<SalesOrderLine> findBackordersForProduct(@Param("productId") Long productId);
+
+
+    boolean existsByProductAndSalesOrder_StatusIn(Product product, List<SOStatus> statuses);
 
 }

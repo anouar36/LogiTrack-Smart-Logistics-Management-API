@@ -20,9 +20,10 @@ public interface InventoryRepository extends JpaRepository<Inventory,Long> {
 
     @Query("SELECT i FROM Inventory i " +
             "WHERE i.product.id = :productId " +
-            "AND i.quantityOnHand > i.quantityReserved " + // الشرط: الستوك المتاح > 0
-            "ORDER BY (i.quantityOnHand - i.quantityReserved) DESC") // الترتيب: من الكبير للصغير
+            "AND i.quantityOnHand > i.quantityReserved " +
+            "ORDER BY (i.quantityOnHand - i.quantityReserved) DESC")
     List<Inventory> findAvailableStockForProduct(@Param("productId") Long productId);
+    Inventory findByProduct(Product product);
 
 
 

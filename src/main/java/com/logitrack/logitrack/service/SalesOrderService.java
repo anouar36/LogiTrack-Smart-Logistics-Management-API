@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.Arrays; // Add this import
 
 import static io.micrometer.observation.transport.Kind.CLIENT;
 
@@ -51,7 +52,7 @@ public class SalesOrderService {
         salesOrder.setStatus(SOStatus.CREATED);
 
 
-     //initializr varible total Price of Sales order 0.00
+        //initializr varible total Price of Sales order 0.00
         BigDecimal totalPriceOrder = BigDecimal.ZERO;
 
         //fix my entity Sales Order Line for checked product and totle price of product
@@ -146,75 +147,74 @@ public class SalesOrderService {
     }
 
     // SalesOrderService.java
-
     @Transactional
     public ResponceSalesOrderDto addProductsToOrder(Long orderId, List<AddProductToOrderRequest> productsToAdd) {
 
+        // find  Order by id
         SalesOrder order = salesOrderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found with id " + orderId));
 
+        // this for back Order aan message errors
         List<String> successMessages = new ArrayList<>();
         List<String> backorderMessages = new ArrayList<>();
 
-        // (تأكد أن عندك ModelMapper معرف)
-        // @Autowired private ModelMapper modelMapper;
-
+        //loop for product request his want client added to his order
         for (AddProductToOrderRequest productDto : productsToAdd) {
 
+            //check if product in database or not
             Product product = productService.getProductById(productDto.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productDto.getProductId()));
 
+            // check if this product is active
             if (!product.isActive()) {
                 backorderMessages.add("Product '" + product.getName() + "' is inactive and was skipped.");
                 continue;
             }
 
-            // 4️⃣  👇👇  هنا كاين التعديل الكبير  👇👇
-            // ما بقيناش كنحسبو الستوك هنا، ولينا كنعيطو نيشان للمحرك
-
+           // call function reserve Product for reserved this product
             Long quantityNeeded = productDto.getQuantity();
             List<AllocationDto> allocations = inventoryService.reserveProduct(product.getId(), quantityNeeded);
 
-            // 4a. حساب شحال تحجز بصح
+            // calcule Quantity reserved
             long totalReservedNow = allocations.stream()
                     .mapToLong(AllocationDto::getAllocatedQuantity)
                     .sum();
 
-            // 4b. حساب شحال باقي ناقص (Backorder)
+            // calcule Remaining_Quantity_To_Reserve
             long remainingToReserve = quantityNeeded - totalReservedNow;
 
-            // 4c. إنشاء الرسالة
+            // create message  for this option back order
+
             if (remainingToReserve > 0) {
                 backorderMessages.add("Backorder: " + remainingToReserve + " units of " + product.getName());
             } else {
                 successMessages.add("Product '" + product.getName() + "' added and reserved.");
             }
-            // 👆👆  نهاية التعديل  👆👆
 
 
-            // 5️⃣ احسب الثمن الكلي
+            // calcule price totale = unitPrice * quantity
             BigDecimal totalPrice = BigDecimal.valueOf(quantityNeeded)
-                    .multiply(product.getPrice()); // (من الأحسن الثمن يكون فـ DTO)
+                    .multiply(product.getPrice());
 
-            // 6️⃣ إنشاء SalesOrderLine
+
+            // create SalesOrderlin in database
             SalesOrderLine line = SalesOrderLine.builder()
                     .product(product)
                     .salesOrder(order)
                     .quantity(quantityNeeded)
-                    .unitPrice(product.getPrice()) // (أو من DTO)
+                    .unitPrice(product.getPrice())
                     .totalPrice(totalPrice)
-                    .remainingQuantityToReserve(remainingToReserve) // 👈  كنسجلو النقص لي تحسب
+                    .remainingQuantityToReserve(remainingToReserve)
                     .build();
 
-            // 7️⃣ زيد الـ line
             salesOrderLineRepository.save(line);
             order.getLines().add(line);
         }
 
-        // 8️⃣ تحديث الـ order
+        //updat SalesOrder for add new lin in  this order
         salesOrderRepository.save(order);
 
-        // 9️⃣ رجع JSON response
+        // return json respence
         BigDecimal finalTotalPrice = order.getLines().stream()
                 .map(SalesOrderLine::getTotalPrice)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -225,7 +225,7 @@ public class SalesOrderService {
                 .clientId(order.getClient().getId())
                 .clientName(order.getClient().getName())
                 .ClientEmail(order.getClient().getUser().getEmail())
-                .status(order.getStatus()) // (غتكون CREATED)
+                .status(order.getStatus())
                 .createdAt(order.getCreatedAt())
                 .lines(order.getLines().stream()
                         .map(line -> modelMapper.map(line, ResponseSalesOrderLineDto.class))
@@ -289,16 +289,13 @@ public class SalesOrderService {
     @Transactional
     public ValidatedOrderDto validateOrder(Long orderId) {
 
-        // 1️⃣ جلب الطلبية (مع السطور والمنتجات)
         SalesOrder order = salesOrderRepository.findByIdWithLinesAndProducts(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
 
-        // 2️⃣ التحقق من الحالة
         if (order.getStatus() != SOStatus.CREATED) {
             throw new OrderValidationException("Order is not in CREATED status. Current status: " + order.getStatus());
         }
 
-        // 3️⃣ التحقق من الـ Null (كنخليوه للأمان)
         boolean hasNullLines = order.getLines().stream()
                 .anyMatch(line -> line.getRemainingQuantityToReserve() == null);
 
@@ -306,53 +303,54 @@ public class SalesOrderService {
             throw new OrderValidationException("Cannot validate order " + orderId + ". One or more lines have unprocessed quantity (null).");
         }
 
-        // 4️⃣ 👇👇  اللوجيك الجديد: محاولة حجز النقص (Backorders) 👇👇
 
-        // ليسته باش نجمعو الأخطاء الجداد
         List<String> newBackorderMessages = new ArrayList<>();
 
-        // غندورو على كاع السطور لي فيهم نقص
         for (SalesOrderLine line : order.getLines()) {
 
             if (line.getRemainingQuantityToReserve() > 0) {
-                // هاد السطر فيه نقص، غنحاولو نحجزوه دابا
 
                 Long quantityToReserve = line.getRemainingQuantityToReserve();
 
-                // 4a. العيطة لسيرفيس الستوك
                 List<AllocationDto> allocation = inventoryService.reserveProduct(line.getProduct().getId(), quantityToReserve);
                 long totalReserved = allocation.stream().mapToLong(AllocationDto::getAllocatedQuantity).sum();
 
-                // 4b. تحديث السطر (Line)
                 long newRemaining = quantityToReserve - totalReserved;
                 line.setRemainingQuantityToReserve(newRemaining);
-                salesOrderLineRepository.save(line); // كنسجلو التحديث ديال السطر
-
-                // 4c. إلا باقي النقص، كنسجلو رسالة خطأ
+                salesOrderLineRepository.save(line);
                 if (newRemaining > 0) {
                     newBackorderMessages.add("Product '" + line.getProduct().getName() + "' still has " + newRemaining + " units on backorder.");
                 }
             }
         }
-        // 👆👆 نهاية اللوجيك الجديد 👆👆
 
 
-        // 5️⃣ القرار (Decision) - دابا غنشوفو واش باقي شي نقص
         if (!newBackorderMessages.isEmpty()) {
-            // ❌ خطأ: فشلت محاولة الحجز، باقي النقص
             String errorMessages = String.join(", ", newBackorderMessages);
             throw new OrderValidationException("Cannot validate order. Stock is still insufficient: " + errorMessages);
         }
 
-        // 6️⃣ ✅ نجاح: كلشي تحجز
         order.setStatus(SOStatus.RESERVED);
         salesOrderRepository.save(order);
 
-        // 7️⃣ رجع جواب ناجح
         return ValidatedOrderDto.builder()
                 .orderId(order.getId())
                 .newStatus(order.getStatus())
                 .message("Order validated successfully. All items reserved.")
                 .build();
+    }
+
+    public Boolean checkStustOrderByProduct(Product product){
+         List<SalesOrder> salesOrders =  salesOrderRepository.findAll();
+         for ( SalesOrder salesOrder : salesOrders){
+             if(salesOrder.getStatus() == SOStatus.CREATED || salesOrder.getStatus() == SOStatus.RESERVED){
+                 for(SalesOrderLine salesOrderLine : salesOrder.getLines()){
+                     if(salesOrderLine.getProduct().getId()== product.getId()){
+                         return  true;
+                     }
+                 }
+             }
+         }
+         return false;
     }
 }

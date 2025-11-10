@@ -4,20 +4,33 @@ import com.logitrack.logitrack.dto.Product.ProductAvailabilityDto;
 import com.logitrack.logitrack.dto.Product.RequestDTO;
 import com.logitrack.logitrack.dto.Product.ResponseDTO;
 import com.logitrack.logitrack.entity.Product;
+import com.logitrack.logitrack.exception.ResourceNotFoundException;
 import com.logitrack.logitrack.mapper.CreatProductMapper;
 import com.logitrack.logitrack.repository.ProductRepository;
+import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
+import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.stereotype.Service;
+import org.springframework.context.annotation.Lazy;
 
 import java.util.List;
 import java.util.Optional;
 
 @Service
-@AllArgsConstructor
 public class ProductService {
 
-    private final ProductRepository productRepository;
-    private final CreatProductMapper productMapper;
+    private final InventoryService inventoryService;
+    private  ProductRepository productRepository;
+    private  CreatProductMapper productMapper;
+    private  SalesOrderLineService salesOrderLineService;
+    private final SalesOrderService salesOrderService;
+    public ProductService(ProductRepository productRepository, @Lazy SalesOrderService salesOrderService, SalesOrderLineService salesOrderLineService, CreatProductMapper creatProductMapper, InventoryService inventoryService) { // <-- أضف @Lazy هنا
+        this.productRepository = productRepository;
+        this.salesOrderService = salesOrderService;
+        this.productMapper = productMapper;
+        this.salesOrderLineService = salesOrderLineService;
+        this.inventoryService = inventoryService;
+    }
 
     public ResponseDTO addProducte(RequestDTO creatProductDTO){
         Boolean productExists=  productRepository.existsByNameAndSku(creatProductDTO.getName(),creatProductDTO.getSku());
@@ -122,21 +135,16 @@ public class ProductService {
 
     public ProductAvailabilityDto checkProductAvailabilityBySku(String sku) {
 
-        // 1. كنقلبو على المنتج بـ SKU
         Optional<Product> productOpt = productRepository.findBySku(sku);
 
-        // 2. الحالة 0: المنتج ما كاينش أصلاً (SKU Inexistant)
         if (productOpt.isEmpty()) {
-            // كنرميو Exception باش يرجع Error 404 (Not Found)
-            // (من الأحسن دير Custom Exception ديالك)
+
             throw new RuntimeException("Produit non trouvé avec SKU: " + sku);
         }
 
         Product product = productOpt.get();
 
-        // 3. دابا غنطبقو الشروط ديالك
         if (product.isActive()) {
-            // ✅ الحالة 1: (Given un SKU existant [et actif])
             return ProductAvailabilityDto.builder()
                     .sku(product.getSku())
                     .name(product.getName())
@@ -145,15 +153,34 @@ public class ProductService {
                     .message("Produit disponible à la vente.")
                     .build();
         } else {
-            // ❌ الحالة 2: (Given un SKU inactif)
             return ProductAvailabilityDto.builder()
                     .sku(product.getSku())
-                    .name(product.getName()) // كنرجعو السمية وخا هو inactif
+                    .name(product.getName())
                     .category(product.getCategory())
                     .available(false)
                     .message("Ce produit est inactif et n'est pas disponible à la vente.")
                     .build();
         }
+    }
+
+
+    @Transactional
+    public Boolean actionActiveProduct(Long id ) {
+        Product product = productRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Shipment not found with id: " + id));
+
+        if (product.isActive() == true) {
+            Boolean cheking = salesOrderService.checkStustOrderByProduct(product);
+            Boolean chekinInvetory = inventoryService.chectQuentutProduct(product);
+            if(cheking == true || chekinInvetory == true) {
+                throw new RuntimeException("this product all ready in Order created or reserved or his hav Quentity");
+            }
+            product.setActive(false);
+        } else {
+            product.setActive(true);
+        }
+        productRepository.save(product);
+        return  true;
+
     }
 
 

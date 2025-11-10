@@ -162,6 +162,13 @@ public class ProductController {
         ProductAvailabilityDto dto = productService.checkProductAvailabilityBySku(sku);
         return ResponseEntity.ok(dto);
 
-
     }
+
+    @PutMapping("active/{id}")
+        public Boolean actionActiveProduct(@PathVariable Long id) {
+
+            boolean result = productService.actionActiveProduct(id);
+            return result;
+        }
+
 }

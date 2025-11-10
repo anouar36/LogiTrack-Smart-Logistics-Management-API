@@ -30,6 +30,7 @@ public class InventoryService {
 
 
 
+    //add Quantity OnHand
     public Inventory addQtyOnHand(RequestAddQtyOnHandDto dto) {
         Inventory inventory = inventoryRepository
                 .findByProductIdAndWarehouseId(dto.getProductId(), dto.getWarehouseId())
@@ -40,6 +41,8 @@ public class InventoryService {
 
         return inventoryRepository.save(inventory);
     }
+
+    //create Inventory
     public ResponseInventoryDto creatInventory(RequestInventoryDto dto){
         Optional<Inventory> existingInventory =
                 inventoryRepository.existsByProductIdAndWarehouseId(dto.getProductId(), dto.getWarehouseId());
@@ -59,137 +62,138 @@ public class InventoryService {
 
 
     }
+
+    //reserve Product
     @Transactional
     public List<AllocationDto> reserveProduct(Long productId, Long quantityNeeded) {
 
+        // list return of warehouseId and allocatedQuantity
         List<AllocationDto> allocations = new ArrayList<>();
         long remainingToReserve = quantityNeeded;
 
-        // 1. جيب غير الستوك لي بغينا (مصفى (filtered) ومرتب)
+        //  find Available Stock For Product DESC
         List<Inventory> inventories = inventoryRepository.findAvailableStockForProduct(productId);
 
         if (inventories.isEmpty()) {
-            System.out.println("No available stock found for product: " + productId);
-            return allocations; // رجع 0
+            throw new RuntimeException("No available stock found for product: " + productId);
         }
 
-        // 2. لوب (Loop) على المستودعات لي فيهم السلعة
+        // loop for all Inventory his have Quantity
         for (Inventory inv : inventories) {
 
+            // if remainingToReserve <= 0 all new stock his reserved
             if (remainingToReserve <= 0) {
-                break; // صافي حجزنا الكمية لي بغينا
+                break;
             }
 
+            // catch Quantity his want this Inventory
             long availableInThisWarehouse = inv.getQuantityOnHand() - inv.getQuantityReserved();
             long qtyToReserveFromThis = Math.min(availableInThisWarehouse, remainingToReserve);
 
-            // 3. ✨✨ الحجز الفعلي ✨✨
+            //reserved this Quantity
             inv.setQuantityReserved(inv.getQuantityReserved() + qtyToReserveFromThis);
-            inventoryRepository.save(inv); // 👈 ضروري تسجل التغيير
+            inventoryRepository.save(inv);
 
-            // 4. تسجيل العملية
+            // add in List of this dto becouse return
             allocations.add(new AllocationDto(inv.getWarehouse().getId(), qtyToReserveFromThis));
 
-            // 5. نقص داكشي لي تحجز
+            // Quantity available = Quantity available - Reserved quantity
             remainingToReserve -= qtyToReserveFromThis;
         }
 
         if (remainingToReserve > 0) {
-            System.out.println("We were unable to allocate the entire quantity requested; the remaining amount is:" + remainingToReserve);
+            throw new RuntimeException(
+                    "Unable to reserve the full quantity. Remaining unallocated quantity: " + remainingToReserve
+            );
         }
 
         return allocations;
     }
 
-    // ... (باقي الكود ديالك ديال "receiveStockAndFulfillBackorders"...)
-
-
-
+    //receive Stock And Ful fill Backorders
     @Transactional
     public void receiveStockAndFulfillBackorders(Product product, Warehouse warehouse, Long quantityReceived) {
 
-        // --- الجزء 1: استلام الستوك (US14 / US6) ---
 
-        // 1. جلب أو إنشاء الـ Inventory
+        // Get Inventory by Product an warehouse
         Optional<Inventory> inventoryOpt = inventoryRepository.findByProductAndWarehouse(product, warehouse);
+
+        // if this Inventory exists use this else create new Inventory
 
         Inventory inventory;
         if (inventoryOpt.isPresent()) {
-            // 👈  الحالة 1: لقينا الـ Inventory
+
             inventory = inventoryOpt.get();
         } else {
-            // 👈  الحالة 2: ما لقيناش، غنصاوبو واحد جديد
             inventory = Inventory.builder()
                     .product(product)
                     .warehouse(warehouse)
                     .quantityOnHand(0L)
                     .quantityReserved(0L)
-                    .movements(new ArrayList<>()) // (مهمة: خاصو يتصاوب خاوي)
+                    .movements(new ArrayList<>())
                     .build();
-            // (ما محتاجينش .lastUpdatedAt حيتاش عندك قيمة افتراضية)
         }
 
-        // 2. زيادة الستوك
+        // Add new sotck to laste stock
         inventory.setQuantityOnHand(inventory.getQuantityOnHand() + quantityReceived);
         inventoryRepository.save(inventory);
 
-        // 3. تسجيل الحركة (Movement)
+        // create Movement for this change stock;
         InventoryMovement movement = InventoryMovement.builder()
                 .product(product)
-                .inventory(inventory) // 👈  ها هو التصحيح
+                .inventory(inventory)
                 .quantity(quantityReceived)
-                .type(MovementType.INBOUND) // (تأكد أن الـ Enum ديالك سميتو MovementType)
+                .type(MovementType.INBOUND)
                 .build();
         movementRepository.save(movement);
 
-        // --- الجزء 2: تنفيذ الطلبيات (US9 الأوتوماتيكي) ---
 
-        // 4. جلب الستوك المتاح (Available) الإجمالي لهاد المنتج
-        // (هاد الميتود خاصك تصاوبها: كدير (sum(onHand) - sum(reserved))
+        // Get Available Stock After Add Stock QH - QR
         long availableStock = getGlobalAvailableStock(product.getId());
 
+        // if availableStock <= 0 this his not desponible for backsOrders
         if (availableStock <= 0) {
-            return; // الستوك لي دخل يلاه كافح للحجوزات القديمة، ما كاين ما يتفرق
+            return;
         }
 
-        // 5. جلب كاع الطلبيات (SO) لي كتسنى هاد المنتج
+        //Get all OrdersLine his have avalue > 0 in column Remaining_Quantity_To_Reserve
         List<SalesOrderLine> linesToFulfill = salesOrderLineRepository.findBackordersForProduct(product.getId());
 
-        Set<Long> updatedOrderIds = new HashSet<>(); // باش نعرفو شكون الطلبيات لي تعدلو
+        // for chow orderLine all ready upate
+        Set<Long> updatedOrderIds = new HashSet<>();
 
+        //loop for all SalesOrderLine for change Remaining_Quantity_To_Reserve if availableStock > 0 else return for loop to anther product
         for (SalesOrderLine line : linesToFulfill) {
             if (availableStock <= 0) {
-                break; // صافي كملنا الستوك لي يلاه دخل
+                break;
             }
 
+            // Quantity his needed this OrderLin
             long needed = line.getRemainingQuantityToReserve();
+
             long canReserveNow = Math.min(availableStock, needed);
 
-            // 6. ✨ كنعيطو للميتود ديالنا القديمة باش تحجز!
-            // (غنعدلوها شوية باش تخدم مزيان)
+            // call function reserve Product for reserved Quentity Rolback Order
             reserveProduct(product.getId(), canReserveNow);
 
-            // 7. تحديث السطر (Line)
+            // update Remaining_Quantity_To_Reserve if all quantity desponible Remaining_Quantity_To_Reserve=0
             line.setRemainingQuantityToReserve(needed - canReserveNow);
             salesOrderLineRepository.save(line);
 
-            availableStock -= canReserveNow; // نقصو من الستوك المتاح
+            // We reduce the available stock.
+            availableStock -= canReserveNow;
             updatedOrderIds.add(line.getSalesOrder().getId());
         }
 
-        // --- الجزء 3: تحديث حالة الطلبيات (SO) ---
-
-        // 8. كنتحققو من الطلبيات لي تعدلات
+        // call function checkAndSetOrderStatus for reflsh database salseOrder
+        // if order all lins his have 0 in Remaining_Quantity_To_Reserve
+        // and his have status created change status to reserved automatique
         for (Long orderId : updatedOrderIds) {
             checkAndSetOrderStatus(orderId);
         }
     }
 
-    // --- ميتودات مساعدة خاصك تزيدها في هاد السيرفيس ---
-
-    /**
-     * كيحسب الستوك المتاح الإجمالي لمنتج معين
-     */
+    // calcul avilble sotck of som product  in inventory = totalOnHand - totalReserved
     public long getGlobalAvailableStock(Long productId) {
         List<Inventory> inventories = inventoryRepository.findByProductId(productId);
         long totalOnHand = inventories.stream().mapToLong(Inventory::getQuantityOnHand).sum();
@@ -197,14 +201,12 @@ public class InventoryService {
         return totalOnHand - totalReserved;
     }
 
-    /**
-     * كيتأكد واش الطلبية كاملة تحجزات، ويبدل ليها الحالة
-     */
+    // check Remaining_Quantity_To_Reserve And SetOrder Status
     private void checkAndSetOrderStatus(Long orderId) {
         SalesOrder order = salesOrderRepository.findByIdWithLinesAndProducts(orderId).orElse(null);
         if (order == null) return;
 
-        // كنتحققو واش باقي شي سطر فيه نقص
+        // check if Remaining_Quantity_To_Reserve his hav value or not
         boolean allReserved = order.getLines().stream()
                 .allMatch(line -> line.getRemainingQuantityToReserve() == 0);
 
@@ -213,9 +215,21 @@ public class InventoryService {
             salesOrderRepository.save(order);
         }
     }
+    public boolean chectQuentutProduct(Product product){
+        Inventory inventory = inventoryRepository.findByProduct(product);
 
-    // (الميتود "reserveProduct" ديالك خاصها تعدل شوية باش ما ترجعش List<AllocationDto>
-    // وترجع شحال قدرات تحجز)
+        if (inventory == null) {
+            return false;
+        }
+        if(inventory.getQuantityOnHand() > 0){
+            return  false ;
+        }else{
+            return true ;
+        }
+
+    }
+
+
 }
 
 

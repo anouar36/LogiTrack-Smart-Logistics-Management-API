@@ -22,7 +22,8 @@ public class SalesOrder {
     
     @Enumerated(EnumType.STRING)
     private SOStatus status;
-    
+
+    @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
     
     @ManyToOne
@@ -36,4 +37,8 @@ public class SalesOrder {
 
     @OneToMany(mappedBy = "salesOrder", cascade = CascadeType.ALL)
     private List<Shipment> shipments;
+
+    @ManyToOne
+    @JoinColumn(name = "warehouse_id")
+    private Warehouse warehouse;
 }
