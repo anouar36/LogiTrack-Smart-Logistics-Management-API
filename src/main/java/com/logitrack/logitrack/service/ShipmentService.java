@@ -36,10 +36,7 @@ public class ShipmentService {
         this.inventoryMovementRepository = inventoryMovementRepository;
     }
 
-    /**
-     * US11 - Action 1: Handles the start of the shipment (Dispatch).
-     * Transitions status from RESERVED -> SHIPPED.
-     */
+
     @Transactional // Ensures that if any part fails, the database rolls back.
     public ShipmentDTO dispatchShipment(Long shipmentId) {
 
