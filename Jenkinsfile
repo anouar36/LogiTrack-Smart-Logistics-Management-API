@@ -1,10 +1,8 @@
 pipeline {
-    agent any // كيعني: خدم فـ أي بلاصة متاحة
+    agent any
 
-    // الأدوات لي غنحتاجو (هادو هوما السميات لي درنا فـ 'Global Tools')
     tools {
-        maven 'Maven_Auto'  // تأكد أنها نفس السمية لي درتي فـ Jenkins
-        jdk 'JDK_17'        // تأكد أنها نفس السمية
+        maven 'Maven_Auto'
     }
 
     stages {
