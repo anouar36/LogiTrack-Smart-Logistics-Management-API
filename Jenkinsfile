@@ -22,16 +22,22 @@ pipeline {
             }
         }
 
+        // ... (المراحل اللولة)
+
         stage('3. Analyse SonarQube (تحليل الجودة)') {
             steps {
-                // هادي هي لي غتصيفط التقارير لـ SonarQube
-                // (السمية 'SonarQube_CI' هي لي درنا فـ 'Configure System')
-                withSonarQubeEnv('SonarQube_CI') {
-                    // خاصك تبدل 'logitrack-api' بالـ Project Key لي درتي فـ SonarQube
-                    sh 'mvn sonar:sonar -Dsonar.projectKey=logitrack-api'
+                // كنحيدو withSonarQubeEnv حيت ما تقناش فيها
+                // وكنجيبو الساروت (Token) بيدينا
+                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_LOGIN_TOKEN')]) {
+
+                    // وكنحقنوه (inject) نيشان فـ الكوماندا ديال Maven
+                    // (تأكد أن 'sonar-token' هي الـ ID لي درتي فـ Jenkins Credentials)
+                    sh "mvn sonar:sonar -Dsonar.projectKey=logitrack-api -Dsonar.login=${SONAR_LOGIN_TOKEN}"
                 }
             }
         }
+
+        // ... (المراحل الخرين)
 
         stage('4. Quality Gate Check (فحص البوابة)') {
             steps {
