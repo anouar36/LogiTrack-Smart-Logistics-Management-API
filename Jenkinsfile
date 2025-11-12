@@ -29,7 +29,7 @@ pipeline {
                         mvn sonar:sonar \
                         -Dsonar.projectKey=logitrack-api \
                         -Dsonar.host.url=http://sonarqube_ci:9000 \
-                        -Dsonar.login=\${SONAR_LOGIN_TOKEN}
+                        -Dsonar.login=sqp_bc8ba715e935db99551cb797ee930a4ee5207103
                     """
                 }
             }
