@@ -32,8 +32,8 @@ pipeline {
 
                     // وكنحقنوه (inject) نيشان فـ الكوماندا ديال Maven
                     // (تأكد أن 'sonar-token' هي الـ ID لي درتي فـ Jenkins Credentials)
-                    sh "mvn sonar:sonar -Dsonar.projectKey=logitrack-api -Dsonar.login=${SONAR_LOGIN_TOKEN}"
-                }
+//                                                                              <--- هادا هو الجديد
+sh "mvn sonar:sonar -Dsonar.projectKey=logitrack-api -Dsonar.login=${SONAR_LOGIN_TOKEN} -Dsonar.host.url=http://sonarqube_ci:9000"                }
             }
         }
 
