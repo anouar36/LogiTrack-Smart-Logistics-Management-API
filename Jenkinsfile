@@ -4,7 +4,7 @@ pipeline {
 
     tools {
         // استعمل Maven لي عرفناه فـ Jenkins
-        maven 'Maven_Auto'
+        maven 'M3'
     }
 
     stages {
