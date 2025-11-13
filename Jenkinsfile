@@ -1,10 +1,9 @@
-Groovy
 pipeline {
     agent any // خدم فـ أي بلاصة
 
     tools {
         // استعمل Maven لي عرفناه فـ Jenkins
-        maven 'M3'
+        maven 'Maven_Auto'
     }
 
     stages {
