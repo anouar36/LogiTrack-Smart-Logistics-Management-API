@@ -1,32 +1,35 @@
+Groovy
 pipeline {
-    agent any
+    agent any // خدم فـ أي بلاصة
 
     tools {
+        // استعمل Maven لي عرفناه فـ Jenkins
         maven 'Maven_Auto'
     }
 
     stages {
+        // المرحلة 1: جلب آخر نسخة من الكود
         stage('1. Checkout Code (جلب الكود)') {
             steps {
-                // هادي كيجيب الكود من Git لي عرفتيه الفوق
                 checkout scm
             }
         }
 
+        // المرحلة 2: البناء والاختبار (أهم مرحلة)
         stage('2. Build & Test (بناء واختبار)') {
             steps {
-                // هادي هي الكوماندا السحرية:
-                // clean = نقي
-                // verify = دوز التيستات (JUnit) وصاوب التقرير (JaCoCo)
+                // هادي كتشغل JUnit (مع H2) وكتولد تقرير JaCoCo
                 sh 'mvn clean verify'
             }
         }
 
-        // ...
+        // المرحلة 3: إرسال التقرير لـ SonarQube
         stage('3. Analyse SonarQube (تحليل الجودة)') {
             steps {
-                //   هنا فين تبدل: 'sonar-token'   <---   'sonar-key-jdid'
+                // كنجبدو الساروت (Token) لي سميناه 'sonar-key-jdid'
                 withCredentials([string(credentialsId: 'sonar-key-jdid', variable: 'SONAR_LOGIN_TOKEN')]) {
+
+                    // كنخدمو الكوماندا مع الساروت والعنوان الصحيح
                     sh """
                         mvn sonar:sonar \
                         -Dsonar.projectKey=logitrack-api \
@@ -36,13 +39,12 @@ pipeline {
                 }
             }
         }
-        // ...
 
+        // المرحلة 4: فحص بوابة الجودة
         stage('4. Quality Gate Check (فحص البوابة)') {
             steps {
-                // كنتسناو SonarQube يجاوبنا واش الكود نقي ولا لا
+                // كنتسناو الجواب ديال SonarQube (ناجح أو فاشل)
                 timeout(time: 1, unit: 'HOURS') {
-                    // abortPipeline: true = حبس كلشي إيلا الكود ناقص
                     waitForQualityGate abortPipeline: true
                 }
             }
@@ -50,12 +52,11 @@ pipeline {
     }
 
     post {
-        // هادشي كيدار فـ اللخر ديما (سوا نجح الـ build ولا فشل)
         always {
-            // هادا من الـ "Livrables": أرشفة تقارير JUnit
+            // أرشفة تقارير JUnit (باش تبان فـ Jenkins)
             junit 'target/surefire-reports/*.xml'
 
-            // هادا باش يبان داك الكرافيك ديال JaCoCo فـ Jenkins
+            // أرشفة تقارير JaCoCo (باش يبان الكرافيك)
             jacoco(execPattern: 'target/jacoco.exec')
         }
     }
