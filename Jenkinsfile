@@ -26,7 +26,7 @@ pipeline {
         stage('3. Analyse SonarQube (تحليل الجودة)') {
             steps {
                 // كنجبدو الساروت (Token) لي سميناه 'sonar-key-jdid'
-                withCredentials([string(credentialsId: 'sonar-key', variable: 'SONAR_LOGIN_TOKEN')]) {
+                withCredentials([string(credentialsId: 'sonar-global-token', variable: 'SONAR_LOGIN_TOKEN')]) {
 
                     // كنخدمو الكوماندا مع الساروت والعنوان الصحيح
                     sh """
