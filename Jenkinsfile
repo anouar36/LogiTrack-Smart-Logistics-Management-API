@@ -12,29 +12,28 @@ pipeline {
             steps {
                 checkout scm
             }
-        }
-
-        // المرحلة 2: البناء والاختبار (أهم مرحلة)
+        }        // المرحلة 2: البناء والاختبار (أهم مرحلة)
         stage('2. Build & Test (بناء واختبار)') {
             steps {
                 // هادي كتشغل JUnit (مع H2) وكتولد تقرير JaCoCo
                 sh 'mvn clean verify'
             }
         }
-
+        
         // المرحلة 3: إرسال التقرير لـ SonarQube
         stage('3. Analyse SonarQube (تحليل الجودة)') {
             steps {
-                // كنجبدو الساروت (Token) لي سميناه 'sonar-key-jdid'
-                withCredentials([string(credentialsId: 'sonar-global-token', variable: 'SONAR_LOGIN_TOKEN')]) {
-
-                    // كنخدمو الكوماندا مع الساروت والعنوان الصحيح
-                    sh """
-                        mvn sonar:sonar \
-                        -Dsonar.projectKey=logitrack-api \
-                        -Dsonar.host.url=http://sonarqube_ci:9000 \
-                        -Dsonar.login=\${SONAR_LOGIN_TOKEN}
-                    """
+                // كنجبدو الساروت (Token) لي سميناه 'sonar-global-token'
+                withCredentials([string(credentialsId: 'sonar-global-token', variable: 'SONAR_LOGIN_TOKEN')]) {                // كنخدمو الكوماندا مع الساروت والعنوان الصحيح
+                sh """
+                    mvn org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar \
+                    -Dsonar.projectKey=logitrack-api \
+                    -Dsonar.projectName="LogiTrack API" \
+                    -Dsonar.host.url=http://sonarqube-ci:9000 \
+                    -Dsonar.token=\${SONAR_LOGIN_TOKEN} \
+                    -Dsonar.java.coveragePlugin=jacoco \
+                    -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+                """
                 }
             }
         }
