@@ -19,21 +19,23 @@ pipeline {
                 sh 'mvn clean verify'
             }
         }
-        
-        // المرحلة 3: إرسال التقرير لـ SonarQube
+          // المرحلة 3: إرسال التقرير لـ SonarQube
         stage('3. Analyse SonarQube (تحليل الجودة)') {
             steps {
-                // كنجبدو الساروت (Token) لي سميناه 'sonar-global-token'
-                withCredentials([string(credentialsId: 'sonar-global-token', variable: 'SONAR_LOGIN_TOKEN')]) {                // كنخدمو الكوماندا مع الساروت والعنوان الصحيح
-                sh """
-                    mvn org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar \
-                    -Dsonar.projectKey=logitrack-api \
-                    -Dsonar.projectName="LogiTrack API" \
-                    -Dsonar.host.url=http://sonarqube-ci:9000 \
-                    -Dsonar.token=\${SONAR_LOGIN_TOKEN} \
-                    -Dsonar.java.coveragePlugin=jacoco \
-                    -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
-                """
+                // كنخدمو withSonarQubeEnv باش نربطو مع الساروت
+                withSonarQubeEnv('SonarQube') {
+                    // كنجبدو الساروت (Token) لي سميناه 'sonar-global-token'
+                    withCredentials([string(credentialsId: 'sonar-global-token', variable: 'SONAR_LOGIN_TOKEN')]) {
+                        // كنخدمو الكوماندا مع الساروت والعنوان الصحيح
+                        sh """
+                            mvn org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar \
+                            -Dsonar.projectKey=logitrack-api \
+                            -Dsonar.projectName="LogiTrack API" \
+                            -Dsonar.token=\${SONAR_LOGIN_TOKEN} \
+                            -Dsonar.java.coveragePlugin=jacoco \
+                            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+                        """
+                    }
                 }
             }
         }
