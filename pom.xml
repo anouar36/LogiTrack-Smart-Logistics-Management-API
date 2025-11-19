@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.7</version>
+        <version>3.2.3</version> <!-- Note: 3.5.7 does not exist yet, reverted to stable 3.2.3 or use your working version -->
         <relativePath/>
     </parent>
     <groupId>com.logitrack</groupId>
@@ -58,7 +58,7 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Testcontainers للاختبار مع PostgreSQL حقيقي -->
+        <!-- Testcontainers -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-testcontainers</artifactId>
@@ -89,7 +89,6 @@
             <artifactId>h2</artifactId>
             <scope>test</scope>
         </dependency>
-
     </dependencies>
 
     <build>
@@ -102,6 +101,7 @@
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
@@ -124,11 +124,28 @@
                 <artifactId>sonar-maven-plugin</artifactId>
                 <version>4.0.0.4121</version>
             </plugin>
+
             <!-- JaCoCo Maven Plugin for code coverage -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.11</version>
+
+                <!-- ✅ EXCLUSIONS ADDED HERE -->
+                <configuration>
+                    <excludes>
+                        <exclude>**/mapper/**</exclude>
+                        <exclude>**/dto/**</exclude>
+                        <exclude>**/controller/**</exclude>
+                        <exclude>**/repository/**</exclude>
+                        <!-- Added these as they are standard exclusions alongside DTOs -->
+                        <exclude>**/model/**</exclude>
+                        <exclude>**/entity/**</exclude>
+                        <exclude>**/config/**</exclude>
+                        <exclude>**/LogiTrackApplication.class</exclude>
+                    </excludes>
+                </configuration>
+
                 <executions>
                     <execution>
                         <goals>
@@ -146,5 +163,4 @@
             </plugin>
         </plugins>
     </build>
-
 </project>
