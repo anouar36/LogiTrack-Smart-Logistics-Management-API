@@ -7,11 +7,9 @@ import com.logitrack.logitrack.entity.Product;
 import com.logitrack.logitrack.exception.ResourceNotFoundException;
 import com.logitrack.logitrack.mapper.CreatProductMapper;
 import com.logitrack.logitrack.repository.ProductRepository;
-import jakarta.transaction.Transactional;
-import lombok.AllArgsConstructor;
-import org.springframework.data.crossstore.ChangeSetPersister;
-import org.springframework.stereotype.Service;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -20,24 +18,32 @@ import java.util.Optional;
 public class ProductService {
 
     private final InventoryService inventoryService;
-    private  ProductRepository productRepository;
-    private  CreatProductMapper productMapper;
-    private  SalesOrderLineService salesOrderLineService;
+    private final ProductRepository productRepository;
+    private final CreatProductMapper productMapper;
+    private final SalesOrderLineService salesOrderLineService;
     private final SalesOrderService salesOrderService;
-    public ProductService(ProductRepository productRepository, @Lazy SalesOrderService salesOrderService, SalesOrderLineService salesOrderLineService, CreatProductMapper creatProductMapper, InventoryService inventoryService) { // <-- أضف @Lazy هنا
+
+    // Constructor Injection
+    public ProductService(ProductRepository productRepository,
+                          @Lazy SalesOrderService salesOrderService,
+                          SalesOrderLineService salesOrderLineService,
+                          CreatProductMapper creatProductMapper,
+                          InventoryService inventoryService) {
         this.productRepository = productRepository;
         this.salesOrderService = salesOrderService;
-        this.productMapper = productMapper;
+        this.productMapper = creatProductMapper; // Fixed naming consistency
         this.salesOrderLineService = salesOrderLineService;
         this.inventoryService = inventoryService;
     }
 
-    public ResponseDTO addProducte(RequestDTO creatProductDTO){
-        Boolean productExists=  productRepository.existsByNameAndSku(creatProductDTO.getName(),creatProductDTO.getSku());
-        if(productExists){
-           Product product = productMapper.toEntity(creatProductDTO);
-           Product product1 = productRepository.save(product);
-           return productMapper.toDto(product1);
+    public ResponseDTO addProducte(RequestDTO creatProductDTO) {
+        // المنطق كما هو في كودك: يحفظ فقط إذا كان المنتج موجوداً
+        boolean productExists = productRepository.existsByNameAndSku(creatProductDTO.getName(), creatProductDTO.getSku());
+
+        if (productExists) {
+            Product product = productMapper.toEntity(creatProductDTO);
+            Product savedProduct = productRepository.save(product);
+            return productMapper.toDto(savedProduct);
         }
         return null;
     }
@@ -68,7 +74,6 @@ public class ProductService {
             return productMapper.toDto(updatedProduct);
         }).orElse(null);
     }
-
 
     public void deleteProductById(Long id) {
         productRepository.deleteById(id);
@@ -134,54 +139,45 @@ public class ProductService {
     }
 
     public ProductAvailabilityDto checkProductAvailabilityBySku(String sku) {
-
         Optional<Product> productOpt = productRepository.findBySku(sku);
 
         if (productOpt.isEmpty()) {
-
             throw new RuntimeException("Produit non trouvé avec SKU: " + sku);
         }
 
         Product product = productOpt.get();
+        boolean isAvailable = product.isActive();
+        String message = isAvailable ? "Produit disponible à la vente."
+                : "Ce produit est inactif et n'est pas disponible à la vente.";
 
-        if (product.isActive()) {
-            return ProductAvailabilityDto.builder()
-                    .sku(product.getSku())
-                    .name(product.getName())
-                    .category(product.getCategory())
-                    .available(true)
-                    .message("Produit disponible à la vente.")
-                    .build();
-        } else {
-            return ProductAvailabilityDto.builder()
-                    .sku(product.getSku())
-                    .name(product.getName())
-                    .category(product.getCategory())
-                    .available(false)
-                    .message("Ce produit est inactif et n'est pas disponible à la vente.")
-                    .build();
-        }
+        return ProductAvailabilityDto.builder()
+                .sku(product.getSku())
+                .name(product.getName())
+                .category(product.getCategory())
+                .available(isAvailable)
+                .message(message)
+                .build();
     }
 
-
     @Transactional
-    public Boolean actionActiveProduct(Long id ) {
-        Product product = productRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Shipment not found with id: " + id));
+    public Boolean actionActiveProduct(Long id) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Shipment not found with id: " + id));
 
-        if (product.isActive() == true) {
-            Boolean cheking = salesOrderService.checkStustOrderByProduct(product);
-            Boolean chekinInvetory = inventoryService.chectQuentutProduct(product);
-            if(cheking == true || chekinInvetory == true) {
+        if (product.isActive()) {
+            // التحقق قبل التعطيل
+            boolean hasOrders = salesOrderService.checkStustOrderByProduct(product);
+            boolean hasStock = inventoryService.chectQuentutProduct(product); // تأكد من اسم الدالة في InventoryService
+
+            if (hasOrders || hasStock) {
                 throw new RuntimeException("this product all ready in Order created or reserved or his hav Quentity");
             }
             product.setActive(false);
         } else {
             product.setActive(true);
         }
+
         productRepository.save(product);
-        return  true;
-
+        return true;
     }
-
-
 }
