@@ -37,14 +37,13 @@ pipeline {
                 // نتيجة سريعة بدون انتظار Quality Gate
                 echo "✅ SonarQube analysis sent successfully!"
                 echo "🔍 Check results at: http://localhost:9000/dashboard?id=logitrack-api"
-            }
-        }
+            }        }
     }
 
     post {
         always {
             // أرشفة تقارير JUnit
-            junit allowEmptyResults: true, testResultsPattern: 'target/surefire-reports/*.xml'
+            junit allowEmptyResults: true, testResults: 'target/surefire-reports/*.xml'
             
             // أرشفة تقارير JaCoCo
             jacoco(execPattern: 'target/jacoco.exec')
