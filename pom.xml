@@ -23,11 +23,24 @@
         <sonar.projectName>LogiTrack</sonar.projectName>
         <sonar.host.url>http://localhost:9000</sonar.host.url>
         <sonar.token>sqa_a4443853409628289a40ada2deac36b3a584d1d8</sonar.token>
+
         <sonar.coverage.jacoco.xmlReportPaths>target/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
         <sonar.java.coveragePlugin>jacoco</sonar.java.coveragePlugin>
         <sonar.junit.reportPaths>target/surefire-reports</sonar.junit.reportPaths>
         <sonar.sources>src/main/java</sonar.sources>
         <sonar.tests>src/test/java</sonar.tests>
+
+        <sonar.exclusions>
+            **/mapper/**,
+            **/dto/**,
+            **/controller/**,
+            **/repository/**,
+            **/model/**,
+            **/entity/**,
+            **/config/**,
+            **/exception/**,
+            **/LogiTrackApplication.java
+        </sonar.exclusions>
     </properties>
 
     <dependencies>
