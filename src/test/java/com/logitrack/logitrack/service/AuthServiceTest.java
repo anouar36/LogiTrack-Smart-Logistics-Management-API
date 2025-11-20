@@ -67,7 +67,7 @@ class AuthServiceTest {
 
         loginRequest = new LoginRequest();
         loginRequest.setEmail("test@example.com");
-        loginRequest.setPasswordHash("hashedPassword");
+        loginRequest.setPassword("hashedPassword");
     }
 
     // --- Login Tests ---
