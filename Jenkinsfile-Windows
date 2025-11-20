@@ -6,32 +6,32 @@ pipeline {
     }
 
     stages {
-        stage('1. Setup Workspace (إعداد مساحة العمل)') {
+        stage('1. Setup Workspace') {
             steps {
                 script {
-                    echo "🚀 Starting LogiTrack CI/CD Pipeline..."
-                    echo "📁 Working directory: C:/Users/Youcode/IdeaProjects/LogiTrack"
+                    echo "Starting LogiTrack CI/CD Pipeline..."
+                    echo "Working directory: C:/Users/Youcode/IdeaProjects/LogiTrack"
                 }
             }
         }
 
-        stage('2. Build & Test (بناء واختبار)') {
+        stage('2. Build & Test') {
             steps {
                 script {
                     dir('C:/Users/Youcode/IdeaProjects/LogiTrack') {
                         // Clean and compile
                         bat 'mvn clean compile'
-                        
+
                         // Run tests with coverage
                         bat 'mvn test jacoco:report'
-                        
-                        echo "✅ Build and tests completed successfully!"
+
+                        echo "Build and tests completed successfully!"
                     }
                 }
             }
         }
-        
-        stage('3. SonarQube Analysis (تحليل الجودة)') {
+
+        stage('3. SonarQube Analysis') {
             steps {
                 script {
                     dir('C:/Users/Youcode/IdeaProjects/LogiTrack') {
@@ -48,20 +48,20 @@ pipeline {
                                 """
                             }
                         }
-                        
-                        echo "✅ SonarQube analysis completed successfully!"
-                        echo "🔍 Check results at: http://localhost:9000/dashboard?id=logitrack-api"
+
+                        echo "SonarQube analysis completed successfully!"
+                        echo "Check results at: http://localhost:9000/dashboard?id=logitrack-api"
                     }
                 }
             }
         }
 
-        stage('4. Package (تجميع)') {
+        stage('4. Package') {
             steps {
                 script {
                     dir('C:/Users/Youcode/IdeaProjects/LogiTrack') {
                         bat 'mvn package -DskipTests'
-                        echo "📦 Application packaged successfully!"
+                        echo "Application packaged successfully!"
                     }
                 }
             }
@@ -74,26 +74,26 @@ pipeline {
                 dir('C:/Users/Youcode/IdeaProjects/LogiTrack') {
                     // Archive test results
                     publishTestResults testResultsPattern: 'target/surefire-reports/*.xml'
-                    
+
                     // Archive JaCoCo coverage
-                    publishCoverage adapters: [jacocoAdapter('target/site/jacoco/jacoco.xml')], 
+                    publishCoverage adapters: [jacocoAdapter('target/site/jacoco/jacoco.xml')],
                                   sourceFileResolver: sourceFiles('STORE_LAST_BUILD')
-                    
+
                     // Archive artifacts
                     archiveArtifacts artifacts: 'target/*.jar', allowEmptyArchive: true
-                    
-                    echo "🚀 Pipeline completed! All artifacts archived."
+
+                    echo "Pipeline completed! All artifacts archived."
                 }
             }
         }
-        
+
         success {
-            echo "✅ Build successful! All tests passed and quality gate checked."
-            echo "📊 Check SonarQube dashboard for quality metrics."
+            echo "Build successful! All tests passed and quality gate checked."
+            echo "Check SonarQube dashboard for quality metrics."
         }
-        
+
         failure {
-            echo "❌ Build failed. Check the logs above for details."
+            echo "Build failed. Check the logs above for details."
         }
     }
 }
