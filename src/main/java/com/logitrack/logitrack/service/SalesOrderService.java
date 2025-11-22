@@ -44,7 +44,6 @@ public class SalesOrderService {
     public ResponceSalesOrderDto salesOrder(RequestSalesOrderDto dto) {
 
         //this for mapper my request Sales Order Dto to entity
-        //SalesOrder salesOrder = modelMapper.map(dto, SalesOrder.class);
 
         //firste add status of this order Created
         SalesOrder salesOrder = new SalesOrder();

@@ -112,7 +112,7 @@ public class PurchaseOrderService {
     public void receiveFullPurchaseOrder(Long poId, Long warehouseId) {
 
 
-        // get PurchaseOrder By PurchaseOrderId
+        // get PurchaseOrder By Id
         PurchaseOrder po = purchaseOrderRepository.findByIdWithLinesAndProducts(poId)
                 .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found with id: " + poId));
 

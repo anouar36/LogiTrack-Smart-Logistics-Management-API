@@ -1,6 +1,6 @@
 pipeline {
     agent any
-    
+
     tools {
         maven 'M3'
     }
@@ -19,13 +19,14 @@ pipeline {
             steps {
                 script {
                     dir('C:/Users/Youcode/IdeaProjects/LogiTrack') {
-                        // Clean and compile
+
+                        // Clean and compile the project
                         bat 'mvn clean compile'
 
-                        // Run tests with coverage
+                        // Run tests and generate JaCoCo coverage
                         bat 'mvn test jacoco:report'
 
-                        echo "Build and tests completed successfully!"
+                        echo "Build and tests completed successfully."
                     }
                 }
             }
@@ -35,6 +36,8 @@ pipeline {
             steps {
                 script {
                     dir('C:/Users/Youcode/IdeaProjects/LogiTrack') {
+
+                        // Execute SonarQube analysis with token authentication
                         withSonarQubeEnv('SonarQube') {
                             withCredentials([string(credentialsId: 'sonar-global-token', variable: 'SONAR_LOGIN_TOKEN')]) {
                                 bat """
@@ -49,7 +52,7 @@ pipeline {
                             }
                         }
 
-                        echo "SonarQube analysis completed successfully!"
+                        echo "SonarQube analysis completed successfully."
                         echo "Check results at: http://localhost:9000/dashboard?id=logitrack-api"
                     }
                 }
@@ -60,8 +63,10 @@ pipeline {
             steps {
                 script {
                     dir('C:/Users/Youcode/IdeaProjects/LogiTrack') {
+
+                        // Package the application without running tests again
                         bat 'mvn package -DskipTests'
-                        echo "Application packaged successfully!"
+                        echo "Application packaged successfully."
                     }
                 }
             }
@@ -72,24 +77,25 @@ pipeline {
         always {
             script {
                 dir('C:/Users/Youcode/IdeaProjects/LogiTrack') {
-                    // Archive test results
+
+                    // Publish JUnit test results
                     publishTestResults testResultsPattern: 'target/surefire-reports/*.xml'
 
-                    // Archive JaCoCo coverage
+                    // Publish JaCoCo code coverage report
                     publishCoverage adapters: [jacocoAdapter('target/site/jacoco/jacoco.xml')],
-                                  sourceFileResolver: sourceFiles('STORE_LAST_BUILD')
+                                    sourceFileResolver: sourceFiles('STORE_LAST_BUILD')
 
-                    // Archive artifacts
+                    // Archive build artifacts (JAR files)
                     archiveArtifacts artifacts: 'target/*.jar', allowEmptyArchive: true
 
-                    echo "Pipeline completed! All artifacts archived."
+                    echo "Pipeline completed. All artifacts archived."
                 }
             }
         }
 
         success {
-            echo "Build successful! All tests passed and quality gate checked."
-            echo "Check SonarQube dashboard for quality metrics."
+            echo "Build successful. All tests passed and quality checks completed."
+            echo "Check SonarQube dashboard for code quality metrics."
         }
 
         failure {

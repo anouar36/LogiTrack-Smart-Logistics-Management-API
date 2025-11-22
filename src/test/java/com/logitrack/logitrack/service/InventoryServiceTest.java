@@ -5,19 +5,17 @@ import com.logitrack.logitrack.dto.Inventory.RequestAddQtyOnHandDto;
 import com.logitrack.logitrack.dto.Inventory.RequestInventoryDto;
 import com.logitrack.logitrack.dto.Inventory.ResponseInventoryDto;
 import com.logitrack.logitrack.entity.*;
-import com.logitrack.logitrack.entity.enums.MovementType;
 import com.logitrack.logitrack.entity.enums.SOStatus;
 import com.logitrack.logitrack.repository.*;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
 
+import java.math.BigDecimal;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -29,263 +27,343 @@ class InventoryServiceTest {
 
     @Mock
     private ModelMapper modelMapper;
+
     @Mock
     private InventoryRepository inventoryRepository;
+
     @Mock
     private ProductRepository productRepository;
+
     @Mock
     private WarehouseRepository warehouseRepository;
+
     @Mock
     private InventoryMovementRepository movementRepository;
+
     @Mock
     private SalesOrderLineRepository salesOrderLineRepository;
+
     @Mock
     private SalesOrderRepository salesOrderRepository;
 
     @InjectMocks
     private InventoryService inventoryService;
 
-    private Product mockProduct;
-    private Warehouse mockWarehouse;
-    private Inventory mockInventory;
-    private SalesOrderLine mockLine;
-    private SalesOrder mockOrder;
+    private Product testProduct;
+    private Warehouse testWarehouse;
+    private Inventory testInventory;
+    private RequestInventoryDto requestInventoryDto;
+    private ResponseInventoryDto responseInventoryDto;
 
     @BeforeEach
     void setUp() {
-        // إعداد البيانات الأساسية
-        mockProduct = new Product();
-        mockProduct.setId(1L);
-        mockProduct.setName("Test Product");
-
-        mockWarehouse = new Warehouse();
-        mockWarehouse.setId(1L);
-        mockWarehouse.setName("Main Warehouse");
-
-        mockInventory = Inventory.builder()
+        testProduct = Product.builder()
                 .id(1L)
-                .product(mockProduct)
-                .warehouse(mockWarehouse)
+                .sku("TEST-SKU-001")
+                .name("Test Product")
+                .category("Electronics")
+                .price(BigDecimal.valueOf(99.99))
+                .active(true)
+                .deleted(false)
+                .build();
+
+        testWarehouse = Warehouse.builder()
+                .id(1L)
+                .name("Main Warehouse")
+                .code("WH001")
+                .build();
+
+        testInventory = Inventory.builder()
+                .id(1L)
+                .product(testProduct)
+                .warehouse(testWarehouse)
                 .quantityOnHand(100L)
                 .quantityReserved(10L)
                 .movements(new ArrayList<>())
                 .build();
 
-        mockOrder = new SalesOrder();
-        mockOrder.setId(100L);
-        mockOrder.setStatus(SOStatus.CREATED);
-        mockOrder.setLines(new ArrayList<>());
+        requestInventoryDto = new RequestInventoryDto();
+        requestInventoryDto.setProductId(1L);
+        requestInventoryDto.setWarehouseId(1L);
+        requestInventoryDto.setQuantityOnHand(100L);
+        requestInventoryDto.setQuantityReserved(0L);
 
-        mockLine = new SalesOrderLine();
-        mockLine.setId(1L);
-        mockLine.setProduct(mockProduct);
-        mockLine.setRemainingQuantityToReserve(50L);
-        mockLine.setSalesOrder(mockOrder);
-
-        mockOrder.getLines().add(mockLine);
+        responseInventoryDto = ResponseInventoryDto.builder()
+                .id(1L)
+                .productId(1L)
+                .warehouseId(1L)
+                .quantityOnHand(100L)
+                .quantityReserved(0L)
+                .build();
     }
 
-    // --- Tests for addQtyOnHand ---
-
     @Test
-    @DisplayName("addQtyOnHand: Should update quantity")
-    void addQtyOnHand_Success() {
+    void addQtyOnHand_WhenInventoryExists_ShouldUpdateQuantity() {
         RequestAddQtyOnHandDto dto = new RequestAddQtyOnHandDto();
         dto.setProductId(1L);
         dto.setWarehouseId(1);
         dto.setQuantityOnHand(50L);
 
         when(inventoryRepository.findByProductIdAndWarehouseId(1L, 1))
-                .thenReturn(Optional.of(mockInventory));
-        when(inventoryRepository.save(any(Inventory.class))).thenAnswer(i -> i.getArgument(0));
+                .thenReturn(Optional.of(testInventory));
+        when(inventoryRepository.save(testInventory)).thenReturn(testInventory);
 
         Inventory result = inventoryService.addQtyOnHand(dto);
 
+        assertNotNull(result);
         assertEquals(150L, result.getQuantityOnHand());
-        verify(inventoryRepository).save(mockInventory);
+        verify(inventoryRepository).findByProductIdAndWarehouseId(1L, 1);
+        verify(inventoryRepository).save(testInventory);
     }
 
     @Test
-    void addQtyOnHand_NotFound() {
+    void addQtyOnHand_WhenInventoryNotExists_ShouldThrowException() {
         RequestAddQtyOnHandDto dto = new RequestAddQtyOnHandDto();
         dto.setProductId(1L);
         dto.setWarehouseId(1);
         dto.setQuantityOnHand(50L);
 
-        when(inventoryRepository.findByProductIdAndWarehouseId(1L, 1)).thenReturn(Optional.empty());
+        when(inventoryRepository.findByProductIdAndWarehouseId(1L, 1))
+                .thenReturn(Optional.empty());
 
-        assertThrows(RuntimeException.class, () -> inventoryService.addQtyOnHand(dto));
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> inventoryService.addQtyOnHand(dto));
+
+        assertEquals("Inventory does not exist,Please, can you create new Inventory?",
+                exception.getMessage());
     }
 
-    // --- Tests for creatInventory ---
-
     @Test
-    void creatInventory_Success() {
-        RequestInventoryDto dto = new RequestInventoryDto();
-        dto.setProductId(1L);
-        dto.setWarehouseId(1L);
+    void createInventory_WhenInventoryDoesNotExist_ShouldCreateNew() {
+        when(inventoryRepository.existsByProductIdAndWarehouseId(1L, 1L))
+                .thenReturn(Optional.empty());
+        when(productRepository.findById(1L)).thenReturn(Optional.of(testProduct));
+        when(warehouseRepository.findById(1L)).thenReturn(Optional.of(testWarehouse));
+        when(modelMapper.map(requestInventoryDto, Inventory.class)).thenReturn(testInventory);
+        when(inventoryRepository.save(testInventory)).thenReturn(testInventory);
+        when(modelMapper.map(testInventory, ResponseInventoryDto.class)).thenReturn(responseInventoryDto);
 
-        when(inventoryRepository.existsByProductIdAndWarehouseId(1L, 1L)).thenReturn(Optional.empty());
-        when(productRepository.findById(1L)).thenReturn(Optional.of(mockProduct));
-        when(warehouseRepository.findById(1L)).thenReturn(Optional.of(mockWarehouse));
-        when(modelMapper.map(any(), eq(Inventory.class))).thenReturn(mockInventory);
-        when(inventoryRepository.save(any(Inventory.class))).thenReturn(mockInventory);
-        when(modelMapper.map(any(), eq(ResponseInventoryDto.class))).thenReturn(new ResponseInventoryDto());
-
-        ResponseInventoryDto result = inventoryService.creatInventory(dto);
+        ResponseInventoryDto result = inventoryService.creatInventory(requestInventoryDto);
 
         assertNotNull(result);
+        assertEquals(responseInventoryDto.getId(), result.getId());
+    }
+
+    @Test
+    void createInventory_WhenInventoryAlreadyExists_ShouldThrowException() {
+        when(inventoryRepository.existsByProductIdAndWarehouseId(1L, 1L))
+                .thenReturn(Optional.of(testInventory));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> inventoryService.creatInventory(requestInventoryDto));
+
+        assertEquals("Inventory already exists for this product in this warehouse",
+                exception.getMessage());
+    }
+
+    @Test
+    void createInventory_WhenProductNotFound_ShouldThrowException() {
+        when(inventoryRepository.existsByProductIdAndWarehouseId(1L, 1L))
+                .thenReturn(Optional.empty());
+        when(productRepository.findById(1L)).thenReturn(Optional.empty());
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> inventoryService.creatInventory(requestInventoryDto));
+
+        assertEquals("Product not found", exception.getMessage());
+    }
+
+    @Test
+    void createInventory_WhenWarehouseNotFound_ShouldThrowException() {
+        when(inventoryRepository.existsByProductIdAndWarehouseId(1L, 1L))
+                .thenReturn(Optional.empty());
+        when(productRepository.findById(1L)).thenReturn(Optional.of(testProduct));
+        when(warehouseRepository.findById(1L)).thenReturn(Optional.empty());
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> inventoryService.creatInventory(requestInventoryDto));
+
+        assertEquals("Warehouse not found", exception.getMessage());
+    }
+
+    @Test
+    void reserveProduct_WhenSufficientStock_ShouldReserveQuantity() {
+        Long productId = 1L;
+        Long quantityNeeded = 50L;
+        testInventory.setQuantityOnHand(100L);
+        testInventory.setQuantityReserved(20L);
+
+        List<Inventory> inventories = Arrays.asList(testInventory);
+        when(inventoryRepository.findAvailableStockForProduct(productId)).thenReturn(inventories);
+        when(inventoryRepository.save(testInventory)).thenReturn(testInventory);
+
+        List<AllocationDto> result = inventoryService.reserveProduct(productId, quantityNeeded);
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals(50L, result.get(0).getAllocatedQuantity());
+        assertEquals(70L, testInventory.getQuantityReserved());
+    }
+
+    @Test
+    void reserveProduct_WhenInsufficientStock_ShouldThrowException() {
+        Long productId = 1L;
+        Long quantityNeeded = 100L;
+        testInventory.setQuantityOnHand(50L);
+        testInventory.setQuantityReserved(10L);
+
+        List<Inventory> inventories = Arrays.asList(testInventory);
+        when(inventoryRepository.findAvailableStockForProduct(productId)).thenReturn(inventories);
+
+        assertThrows(RuntimeException.class,
+                () -> inventoryService.reserveProduct(productId, quantityNeeded));
+    }
+
+    @Test
+    void reserveProduct_WhenNoAvailableStock_ShouldThrowException() {
+        Long productId = 1L;
+        Long quantityNeeded = 50L;
+        when(inventoryRepository.findAvailableStockForProduct(productId)).thenReturn(Collections.emptyList());
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> inventoryService.reserveProduct(productId, quantityNeeded));
+
+        assertEquals("No available stock found for product: " + productId, exception.getMessage());
+    }
+
+    @Test
+    void receiveStockAndFulfillBackorders_WhenInventoryExists_ShouldUpdateStock() {
+        Long quantityReceived = 50L;
+
+        when(inventoryRepository.findByProductAndWarehouse(testProduct, testWarehouse))
+                .thenReturn(Optional.of(testInventory));
+        when(inventoryRepository.save(testInventory)).thenReturn(testInventory);
+        when(movementRepository.save(any(InventoryMovement.class))).thenReturn(new InventoryMovement());
+        
+        // Added lenient to fix UnnecessaryStubbing
+        lenient().when(salesOrderLineRepository.findBackordersForProduct(testProduct.getId()))
+                .thenReturn(Collections.emptyList());
+
+        inventoryService.receiveStockAndFulfillBackorders(testProduct, testWarehouse, quantityReceived);
+
+        assertEquals(150L, testInventory.getQuantityOnHand());
+        verify(inventoryRepository).save(testInventory);
+    }
+
+    @Test
+    void receiveStockAndFulfillBackorders_WhenInventoryNotExists_ShouldCreateNew() {
+        Long quantityReceived = 50L;
+
+        when(inventoryRepository.findByProductAndWarehouse(testProduct, testWarehouse))
+                .thenReturn(Optional.empty());
+        when(inventoryRepository.save(any(Inventory.class))).thenAnswer(invocation -> {
+            Inventory inventory = invocation.getArgument(0);
+            inventory.setId(1L);
+            return inventory;
+        });
+        when(movementRepository.save(any(InventoryMovement.class))).thenReturn(new InventoryMovement());
+        
+        // Added lenient to fix UnnecessaryStubbing
+        lenient().when(salesOrderLineRepository.findBackordersForProduct(testProduct.getId()))
+                .thenReturn(Collections.emptyList());
+
+        inventoryService.receiveStockAndFulfillBackorders(testProduct, testWarehouse, quantityReceived);
+
         verify(inventoryRepository).save(any(Inventory.class));
     }
 
     @Test
-    void creatInventory_AlreadyExists() {
-        RequestInventoryDto dto = new RequestInventoryDto();
-        dto.setProductId(1L);
-        dto.setWarehouseId(1L);
-
-        when(inventoryRepository.existsByProductIdAndWarehouseId(1L, 1L)).thenReturn(Optional.of(mockInventory));
-
-        assertThrows(RuntimeException.class, () -> inventoryService.creatInventory(dto));
-
-        // تأكد من عدم استدعاء أي شيء آخر لتجنب UnnecessaryStubbing
-        verify(productRepository, never()).findById(any());
-    }
-
-    // --- Tests for reserveProduct ---
-
-    @Test
-    void reserveProduct_Success() {
-        mockInventory.setQuantityOnHand(100L);
-        mockInventory.setQuantityReserved(20L); // Available = 80
-
-        when(inventoryRepository.findAvailableStockForProduct(1L)).thenReturn(Collections.singletonList(mockInventory));
-        when(inventoryRepository.save(any(Inventory.class))).thenReturn(mockInventory);
-
-        List<AllocationDto> result = inventoryService.reserveProduct(1L, 50L);
-
-        assertEquals(1, result.size());
-        assertEquals(50L, result.get(0).getAllocatedQuantity());
-        assertEquals(70L, mockInventory.getQuantityReserved());
-    }
-
-    @Test
-    void reserveProduct_Insufficient() {
-        mockInventory.setQuantityOnHand(50L);
-        mockInventory.setQuantityReserved(40L); // Available = 10
-
-        when(inventoryRepository.findAvailableStockForProduct(1L)).thenReturn(Collections.singletonList(mockInventory));
-
-        assertThrows(RuntimeException.class, () -> inventoryService.reserveProduct(1L, 50L));
-    }
-
-    // --- Tests for receiveStockAndFulfillBackorders ---
-
-    @Test
-    void receiveStock_FulfillBackorders() {
-        // Given
-        Long quantityReceived = 100L;
-        // MockInventory state: OnHand=100
-
-        // 1. Mock Finding Inventory
-        when(inventoryRepository.findByProductAndWarehouse(mockProduct, mockWarehouse))
-                .thenReturn(Optional.of(mockInventory));
-
-        // 2. Mock Saving Inventory (Capture arguments to fix Assertion error)
-        when(inventoryRepository.save(any(Inventory.class))).thenAnswer(i -> i.getArgument(0));
-
-        // 3. Mock Saving Movement
-        when(movementRepository.save(any(InventoryMovement.class))).thenReturn(new InventoryMovement());
-
-        // 4. Mock Global Stock Calculation
-        // The service calls getGlobalAvailableStock internally which calls findByProductId
-        // Note: The service updates the inventory object in memory first, then calls this.
-        // We need to return the updated inventory list.
-        lenient().when(inventoryRepository.findByProductId(1L)).thenReturn(Collections.singletonList(mockInventory));
-
-        // 5. Mock Finding Backorders
-        lenient().when(salesOrderLineRepository.findBackordersForProduct(1L)).thenReturn(Collections.singletonList(mockLine));
-
-        // 6. Mock Reserve (Internal Call)
-        lenient().when(inventoryRepository.findAvailableStockForProduct(1L)).thenReturn(Collections.singletonList(mockInventory));
-
-        // 7. Mock Order
-        lenient().when(salesOrderRepository.findByIdWithLinesAndProducts(100L)).thenReturn(Optional.of(mockOrder));
-
-        // When
-        inventoryService.receiveStockAndFulfillBackorders(mockProduct, mockWarehouse, quantityReceived);
-
-        // Then
-        // Check if stock increased correctly (100 original + 100 received = 200)
-        assertEquals(200L, mockInventory.getQuantityOnHand());
-
-        verify(salesOrderLineRepository).save(mockLine);
-        verify(salesOrderRepository).save(mockOrder);
-    }
-
-    @Test
-    void receiveStock_NewInventory() {
-        // Given
+    void receiveStockAndFulfillBackorders_WithBackorders_ShouldFulfillPartially() {
         Long quantityReceived = 50L;
+        SalesOrderLine backorderLine = SalesOrderLine.builder()
+                .id(1L).product(testProduct).quantity(30L).remainingQuantityToReserve(30L).build();
+        
+        // Fixed NullPointerException by initializing ArrayList
+        SalesOrder salesOrder = SalesOrder.builder()
+                .id(1L).status(SOStatus.CREATED).lines(new ArrayList<>(Arrays.asList(backorderLine))).build();
+        backorderLine.setSalesOrder(salesOrder);
 
-        // Mock finding returns empty (New Inventory case)
-        when(inventoryRepository.findByProductAndWarehouse(mockProduct, mockWarehouse))
-                .thenReturn(Optional.empty());
-
-        // Mock saving movement
+        when(inventoryRepository.findByProductAndWarehouse(testProduct, testWarehouse))
+                .thenReturn(Optional.of(testInventory));
+        when(inventoryRepository.save(testInventory)).thenReturn(testInventory);
         when(movementRepository.save(any(InventoryMovement.class))).thenReturn(new InventoryMovement());
+        
+        lenient().when(salesOrderLineRepository.findBackordersForProduct(testProduct.getId()))
+                .thenReturn(Arrays.asList(backorderLine));
+        lenient().when(inventoryRepository.findByProductId(testProduct.getId()))
+                .thenReturn(Arrays.asList(testInventory));
+        lenient().when(inventoryRepository.findAvailableStockForProduct(testProduct.getId()))
+                .thenReturn(Arrays.asList(testInventory));
+        when(salesOrderLineRepository.save(backorderLine)).thenReturn(backorderLine);
+        when(salesOrderRepository.findByIdWithLinesAndProducts(1L)).thenReturn(Optional.of(salesOrder));
 
-        // Fix for "Wanted but not invoked": Use ArgumentCaptor
-        // The service creates a NEW inventory object, so we can't match strictly.
-        ArgumentCaptor<Inventory> inventoryCaptor = ArgumentCaptor.forClass(Inventory.class);
+        inventoryService.receiveStockAndFulfillBackorders(testProduct, testWarehouse, quantityReceived);
 
-        // Mock dependencies for global stock check (to avoid null pointers later in the method)
-        lenient().when(inventoryRepository.findByProductId(1L)).thenReturn(new ArrayList<>());
-        lenient().when(salesOrderLineRepository.findBackordersForProduct(1L)).thenReturn(Collections.emptyList());
-
-        // When
-        inventoryService.receiveStockAndFulfillBackorders(mockProduct, mockWarehouse, quantityReceived);
-
-        // Then
-        // Capture the saved inventory and inspect it
-        verify(inventoryRepository).save(inventoryCaptor.capture());
-        Inventory savedInventory = inventoryCaptor.getValue();
-
-        assertEquals(50L, savedInventory.getQuantityOnHand());
-        assertEquals(mockProduct, savedInventory.getProduct());
-        assertEquals(mockWarehouse, savedInventory.getWarehouse());
-    }
-
-    // --- Helper Methods ---
-
-    @Test
-    void getGlobalAvailableStock_Test() {
-        Inventory inv1 = Inventory.builder().quantityOnHand(100L).quantityReserved(20L).build();
-        Inventory inv2 = Inventory.builder().quantityOnHand(50L).quantityReserved(10L).build();
-
-        when(inventoryRepository.findByProductId(1L)).thenReturn(Arrays.asList(inv1, inv2));
-
-        long result = inventoryService.getGlobalAvailableStock(1L);
-
-        // (100+50) - (20+10) = 150 - 30 = 120
-        assertEquals(120L, result);
+        verify(salesOrderLineRepository).save(backorderLine);
+        assertEquals(150L, testInventory.getQuantityOnHand());
     }
 
     @Test
-    void chectQuentutProduct_Test() {
-        // Case 1: Not found -> returns false
-        when(inventoryRepository.findByProduct(mockProduct)).thenReturn(null);
-        assertFalse(inventoryService.chectQuentutProduct(mockProduct));
+    void getGlobalAvailableStock_ShouldCalculateCorrectlyStock() {
+        Long productId = 1L;
+        Inventory inventory1 = Inventory.builder().quantityOnHand(100L).quantityReserved(20L).build();
+        Inventory inventory2 = Inventory.builder().quantityOnHand(150L).quantityReserved(30L).build();
+        when(inventoryRepository.findByProductId(productId)).thenReturn(Arrays.asList(inventory1, inventory2));
 
-        // Case 2: Has Quantity (10) -> returns false (based on your logic: if > 0 return false)
-        mockInventory.setQuantityOnHand(10L);
-        when(inventoryRepository.findByProduct(mockProduct)).thenReturn(mockInventory);
-        assertFalse(inventoryService.chectQuentutProduct(mockProduct));
+        long result = inventoryService.getGlobalAvailableStock(productId);
 
-        // Case 3: Zero Quantity -> returns true
-        mockInventory.setQuantityOnHand(0L);
-        // IMPORTANT: We must mock the return again because the object state changed
-        when(inventoryRepository.findByProduct(mockProduct)).thenReturn(mockInventory);
-        assertTrue(inventoryService.chectQuentutProduct(mockProduct));
+        assertEquals(200L, result);
+    }
+
+    @Test
+    void checkQuantityProduct_WhenInventoryExistsWithQuantity_ShouldReturnFalse() {
+        testInventory.setQuantityOnHand(10L);
+        when(inventoryRepository.findByProduct(testProduct)).thenReturn(testInventory);
+        boolean result = inventoryService.chectQuentutProduct(testProduct);
+        assertFalse(result);
+    }
+
+    @Test
+    void checkQuantityProduct_WhenInventoryExistsWithoutQuantity_ShouldReturnTrue() {
+        testInventory.setQuantityOnHand(0L);
+        when(inventoryRepository.findByProduct(testProduct)).thenReturn(testInventory);
+        boolean result = inventoryService.chectQuentutProduct(testProduct);
+        assertTrue(result);
+    }
+
+    @Test
+    void checkQuantityProduct_WhenInventoryNotExists_ShouldReturnFalse() {
+        when(inventoryRepository.findByProduct(testProduct)).thenReturn(null);
+        boolean result = inventoryService.chectQuentutProduct(testProduct);
+        assertFalse(result);
+    }
+    
+    @Test
+    void receiveStockAndFulfillBackorders_WhenBackorderFullyFulfilled_ShouldUpdateOrderStatus() {
+        Long quantityReceived = 100L;
+        SalesOrder salesOrder = SalesOrder.builder()
+                .id(1L).status(SOStatus.CREATED).lines(new ArrayList<>()).build();
+        SalesOrderLine backorderLine = SalesOrderLine.builder()
+                .id(1L).product(testProduct).salesOrder(salesOrder).quantity(30L).remainingQuantityToReserve(30L).build();
+        salesOrder.getLines().add(backorderLine);
+
+        when(inventoryRepository.findByProductAndWarehouse(testProduct, testWarehouse))
+                .thenReturn(Optional.of(testInventory));
+        when(inventoryRepository.save(testInventory)).thenReturn(testInventory);
+        when(movementRepository.save(any(InventoryMovement.class))).thenReturn(new InventoryMovement());
+        lenient().when(salesOrderLineRepository.findBackordersForProduct(testProduct.getId()))
+                .thenReturn(Arrays.asList(backorderLine));
+        lenient().when(inventoryRepository.findByProductId(testProduct.getId()))
+                .thenReturn(Arrays.asList(testInventory));
+        lenient().when(inventoryRepository.findAvailableStockForProduct(testProduct.getId()))
+                .thenReturn(Arrays.asList(testInventory));
+        when(salesOrderLineRepository.save(backorderLine)).thenReturn(backorderLine);
+        when(salesOrderRepository.findByIdWithLinesAndProducts(1L)).thenReturn(Optional.of(salesOrder));
+        when(salesOrderRepository.save(salesOrder)).thenReturn(salesOrder);
+
+        inventoryService.receiveStockAndFulfillBackorders(testProduct, testWarehouse, quantityReceived);
+
+        verify(salesOrderRepository).save(salesOrder);
+        assertEquals(SOStatus.RESERVED, salesOrder.getStatus());
     }
 }

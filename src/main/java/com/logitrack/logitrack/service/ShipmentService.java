@@ -116,10 +116,8 @@ public class ShipmentService {
         return toDto(savedShipment);
     }
 
-    /**
-     * US11 - Action 2: Handles the confirmation of delivery.
-     * Transitions status from SHIPPED -> DELIVERED.
-     */
+
+    // Transitions status from SHIPPED -> DELIVERED.
     @Transactional
     public ShipmentDTO deliverShipment(Long shipmentId) {
 

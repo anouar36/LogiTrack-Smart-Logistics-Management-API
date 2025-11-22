@@ -110,7 +110,7 @@ public class InventoryService {
         return allocations;
     }
 
-    //receive Stock And Ful fill Backorders
+    //receive Stock And Full fill Backorders
     @Transactional
     public void receiveStockAndFulfillBackorders(Product product, Warehouse warehouse, Long quantityReceived) {
 

@@ -6,19 +6,20 @@ pipeline {
     }
 
     stages {
-        stage('1. Checkout Code (جلب الكود)') {
+
+        stage('1. Checkout Code') {
             steps {
                 checkout scm
             }
         }
 
-        stage('2. Build & Test (بناء واختبار)') {
+        stage('2. Build & Test') {
             steps {
                 sh 'mvn clean verify'
             }
         }
-        
-        stage('3. SonarQube Analysis FAST (تحليل سريع)') {
+
+        stage('3. SonarQube Analysis FAST') {
             steps {
                 withSonarQubeEnv('SonarQube') {
                     withCredentials([string(credentialsId: 'sonar-global-token', variable: 'SONAR_LOGIN_TOKEN')]) {
@@ -33,30 +34,31 @@ pipeline {
                         """
                     }
                 }
-                
-                // نتيجة سريعة بدون انتظار Quality Gate
-                echo "✅ SonarQube analysis sent successfully!"
-                echo "🔍 Check results at: http://localhost:9000/dashboard?id=logitrack-api"
-            }        }
+
+                // Fast result without waiting for Quality Gate
+                echo " SonarQube analysis sent successfully!"
+                echo " Check results at: http://localhost:9000/dashboard?id=logitrack-api"
+            }
+        }
     }
 
     post {
         always {
-            // أرشفة تقارير JUnit
+            // Archive JUnit reports
             junit allowEmptyResults: true, testResults: 'target/surefire-reports/*.xml'
-            
-            // أرشفة تقارير JaCoCo
+
+            // Archive JaCoCo coverage
             jacoco(execPattern: 'target/jacoco.exec')
             
-            echo "🚀 Pipeline completed! Check SonarQube dashboard for results."
+            echo " Pipeline completed! Check SonarQube dashboard for results."
         }
         
         success {
-            echo "✅ Build successful! All tests passed."
+            echo " Build successful! All tests passed."
         }
         
         failure {
-            echo "❌ Build failed. Check the logs above."
+            echo " Build failed. Check the logs above."
         }
     }
 }

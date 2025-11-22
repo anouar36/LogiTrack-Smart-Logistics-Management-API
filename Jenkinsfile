@@ -1,4 +1,4 @@
-pipeline {
+    pipeline {
     agent any
 
     tools {
@@ -6,19 +6,19 @@ pipeline {
     }
 
     stages {
-        stage('1. Checkout Code') {
+        stage('1. Checkout Code (جلب الكود)') {
             steps {
                 checkout scm
             }
         }
 
-        stage('2. Build & Test') {
+        stage('2. Build & Test (بناء واختبار)') {
             steps {
                 sh 'mvn clean verify'
             }
         }
         
-        stage('3. SonarQube Analysis FAST') {
+        stage('3. SonarQube Analysis FAST (تحليل سريع)') {
             steps {
                 withSonarQubeEnv('SonarQube') {
                     withCredentials([string(credentialsId: 'sonar-global-token', variable: 'SONAR_LOGIN_TOKEN')]) {
@@ -34,19 +34,18 @@ pipeline {
                     }
                 }
                 
-                // Fast result without waiting for Quality Gate
+                // نتيجة سريعة بدون انتظار Quality Gate
                 echo "✅ SonarQube analysis sent successfully!"
                 echo "🔍 Check results at: http://localhost:9000/dashboard?id=logitrack-api"
             }
         }
     }
 
-    post {
-        always {
-            // Archive JUnit reports (corrected)
+    post {        always {
+            // أرشفة تقارير JUnit (مصححة)
             junit allowEmptyResults: true, testResults: 'target/surefire-reports/*.xml'
             
-            // Archive JaCoCo reports
+            // أرشفة تقارير JaCoCo
             jacoco(execPattern: 'target/jacoco.exec')
             
             echo "🚀 Pipeline completed! Check SonarQube dashboard for results."

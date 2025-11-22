@@ -37,7 +37,7 @@ public class ProductService {
     }
 
     public ResponseDTO addProducte(RequestDTO creatProductDTO) {
-        // المنطق كما هو في كودك: يحفظ فقط إذا كان المنتج موجوداً
+        // The logic, as in your code, saves only if the product exists.
         boolean productExists = productRepository.existsByNameAndSku(creatProductDTO.getName(), creatProductDTO.getSku());
 
         if (productExists) {
