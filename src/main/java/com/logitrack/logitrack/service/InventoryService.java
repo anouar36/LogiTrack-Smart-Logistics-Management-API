@@ -28,6 +28,39 @@ public class InventoryService {
     private final  SalesOrderRepository salesOrderRepository;
 
 
+    // CREATE Inventory
+    public ResponseInventoryDto createInventory(RequestInventoryDto dto) {
+        // Check if inventory already exists for this Product + Warehouse combo
+        Optional<Inventory> existingInventory =
+                inventoryRepository.existsByProductIdAndWarehouseId(dto.getProductId(), dto.getWarehouseId());
+
+        if (existingInventory.isPresent()) {
+            throw new RuntimeException("Inventory already exists for this product in this warehouse");
+        }
+
+        // Verify Product and Warehouse exist
+        Product product = productRepository.findById(dto.getProductId())
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+
+        Warehouse warehouse = warehouseRepository.findById(dto.getWarehouseId())
+                .orElseThrow(() -> new RuntimeException("Warehouse not found"));
+
+        // Map DTO to Entity
+        Inventory inventory = modelMapper.map(dto, Inventory.class);
+
+        // Explicitly set the relationships to be safe
+        inventory.setProduct(product);
+        inventory.setWarehouse(warehouse);
+
+        // Initialize defaults if null
+        if (inventory.getQuantityOnHand() == null) inventory.setQuantityOnHand(0L);
+        if (inventory.getQuantityReserved() == null) inventory.setQuantityReserved(0L);
+
+        Inventory saved = inventoryRepository.save(inventory);
+        return modelMapper.map(saved, ResponseInventoryDto.class);
+    }
+
+
 
 
     //add Quantity OnHand
