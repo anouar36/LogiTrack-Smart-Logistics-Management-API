@@ -58,13 +58,26 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorRespens , HttpStatus.NOT_FOUND) ;
     }
 
-
-
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String ,String>> handleGenericException(Exception ex){
         Map<String,String> errorRespens = new HashMap<>();
         errorRespens.put("message",ex.getMessage());
         return  new ResponseEntity<>(errorRespens, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<Object> handleAuthenticationException(AuthenticationException ex, WebRequest request) {
+        return buildErrorResponse(ex, HttpStatus.UNAUTHORIZED, request);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Object> handleAccessDeniedException(AccessDeniedException ex, WebRequest request) {
+        return buildErrorResponse(ex, HttpStatus.FORBIDDEN, request);
+    }
+
+    @ExceptionHandler(TokenRefreshException.class)
+    public ResponseEntity<Object> handleTokenRefreshException(TokenRefreshException ex, WebRequest request) {
+        return buildErrorResponse(ex, HttpStatus.FORBIDDEN, request);
     }
 
 }

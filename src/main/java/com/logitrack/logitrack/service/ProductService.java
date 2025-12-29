@@ -157,12 +157,10 @@ public class ProductService {
                 .available(isAvailable)
                 .message(message)
                 .build();
-    }
-
-    @Transactional
+    }    @Transactional
     public Boolean actionActiveProduct(Long id) {
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Shipment not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
 
         if (product.isActive()) {
             // التحقق قبل التعطيل

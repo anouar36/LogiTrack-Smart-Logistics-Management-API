@@ -14,11 +14,16 @@ import com.logitrack.logitrack.repository.SalesOrderLineRepository;
 import com.logitrack.logitrack.repository.SalesOrderRepository;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
+import org.apache.juli.logging.LogFactory;
 import org.modelmapper.ModelMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.context.support.BeanDefinitionDsl;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -38,111 +43,112 @@ public class SalesOrderService {
     private final InventoryService inventoryService;
     private final DesplayAllOrdersLineDtosMapper desplayAllOrdersLineDtosMapper;
     private final SalesOrderLineRepository salesOrderLineRepository;
+    private  static final Logger logger = LoggerFactory.getLogger(SalesOrderService.class);
 
 
     @Transactional
     public ResponceSalesOrderDto salesOrder(RequestSalesOrderDto dto) {
+        MDC.put("log_type", "BUSINESS");
+        MDC.put("action", "CREATE_ORDER");
 
-        //this for mapper my request Sales Order Dto to entity
+        logger.info("Order processing has begun");
 
-        //firste add status of this order Created
-        SalesOrder salesOrder = new SalesOrder();
-        salesOrder.setClient(dto.getClient());
-        salesOrder.setStatus(SOStatus.CREATED);
+        try {
+            SalesOrder salesOrder = new SalesOrder();
+            salesOrder.setClient(dto.getClient());
+            salesOrder.setStatus(SOStatus.CREATED);
+            salesOrder.setCreatedAt(LocalDateTime.now());
 
+            salesOrder = salesOrderRepository.save(salesOrder);
 
-        //initializr varible total Price of Sales order 0.00
-        BigDecimal totalPriceOrder = BigDecimal.ZERO;
-
-        //fix my entity Sales Order Line for checked product and totle price of product
-        List<SalesOrderLine> linesToSave = new ArrayList<>();
-        List<String> backOrderProducts = new ArrayList<>();
-
-        for (SalesOrderLine lineFromRequest : dto.getLines()) {
-            // this for check if this product we have a quantity in repository
-            Long productId = lineFromRequest.getProduct().getId();
-            Long remainingQuantityToReserve = 0L ;
-
-            //check desponbelety of this producte
-            List<AllocationDto> allocationDto = inventoryService.reserveProduct(productId,lineFromRequest.getQuantity());
-            if(allocationDto != null){
-                long totalQuantityTaken = allocationDto.stream()
-                        .mapToLong(AllocationDto::getAllocatedQuantity)
-                        .sum();
-
-                remainingQuantityToReserve = lineFromRequest.getQuantity() - totalQuantityTaken ;
+            MDC.put("business_id", salesOrder.getId().toString());
+            logger.info("Order header created successfully with ID: {}", salesOrder.getId());
 
 
-                if (remainingQuantityToReserve == lineFromRequest.getQuantity()) {
-                    throw new RuntimeException(
-                            "Product " + lineFromRequest.getProduct().getName() + " has no available stock."
-                    );
+            BigDecimal totalPriceOrder = BigDecimal.ZERO;
+            List<SalesOrderLine> linesToSave = new ArrayList<>();
+            List<String> backOrderProducts = new ArrayList<>();
+
+            for (SalesOrderLine lineFromRequest : dto.getLines()) {
+                MDC.put("product_id", lineFromRequest.getProduct().getId().toString());
+
+                Long productId = lineFromRequest.getProduct().getId();
+                Long quantityRequested = lineFromRequest.getQuantity();
+
+                // Verification du stock
+                List<AllocationDto> allocationDto = inventoryService.reserveProduct(productId, quantityRequested);
+                Long remainingQuantityToReserve = quantityRequested;
+
+                if (allocationDto != null) {
+                    long totalQuantityTaken = allocationDto.stream()
+                            .mapToLong(AllocationDto::getAllocatedQuantity)
+                            .sum();
+                    remainingQuantityToReserve = quantityRequested - totalQuantityTaken;
                 }
 
+                if (remainingQuantityToReserve.equals(quantityRequested)) {
+                    logger.error("Stock Unavailable: Product {} has 0 stock available.", productId);
+                    throw new RuntimeException("Product " + productId + " has no available stock.");
+                }
+
+                Product product = productService.getProductById(productId)
+                        .orElseThrow(() -> new ProductNotExistsException("Product " + productId + " does not exist"));
+
+                BigDecimal totalPrice = BigDecimal.valueOf(quantityRequested).multiply(lineFromRequest.getUnitPrice());
+
+                SalesOrderLine line = SalesOrderLine.builder()
+                        .quantity(quantityRequested)
+                        .unitPrice(lineFromRequest.getUnitPrice())
+                        .totalPrice(totalPrice)
+                        .product(product)
+                        .salesOrder(salesOrder)
+                        .remainingQuantityToReserve(remainingQuantityToReserve)
+                        .build();
+
+                linesToSave.add(line);
+                totalPriceOrder = totalPriceOrder.add(totalPrice);
+
+                if (line.getRemainingQuantityToReserve() > 0) {
+                    logger.warn("Partial reservation for product {}. Missing: {}", product.getName(), line.getRemainingQuantityToReserve());
+                    backOrderProducts.add(product.getName() + " (Missing: " + line.getRemainingQuantityToReserve() + ")");
+                }
+
+                MDC.remove("product_id");
             }
 
+            salesOrder.setLines(linesToSave);
 
-            Product product = productService.getProductById(productId)
-                    .orElseThrow(() -> new ProductNotExistsException("Product with id " + productId + " does not exist"));
+            List<ResponseSalesOrderLineDto> resultSalesOrderLines = new ArrayList<>();
+            for (SalesOrderLine line : linesToSave) {
+                ResponseSalesOrderLineDto savedLine = salesOrderLineService.addOrderLine(line);
+                resultSalesOrderLines.add(savedLine);
+            }
 
-            //calcule totale price of product Quantity * Unit price
-            BigDecimal quantity = BigDecimal.valueOf(lineFromRequest.getQuantity());
-            BigDecimal totalPrice = quantity.multiply(lineFromRequest.getUnitPrice());
+            Client client = clientService.getClientById(salesOrder.getClient().getId());
 
-            SalesOrderLine line = SalesOrderLine.builder()
-                    .quantity(lineFromRequest.getQuantity())
-                    .unitPrice(lineFromRequest.getUnitPrice())
-                    .totalPrice(totalPrice)
-                    .product(product)
-                    .salesOrder(salesOrder)
-                    .remainingQuantityToReserve(remainingQuantityToReserve)
+            String backOrderMessage = backOrderProducts.isEmpty() ? null :
+                    "Some products could not be fully reserved: " + String.join(", ", backOrderProducts);
+
+            logger.info("Order processed successfully. Total Price: {}", totalPriceOrder);
+
+            return ResponceSalesOrderDto.builder()
+                    .message(backOrderMessage)
+                    .clientId(client.getId())
+                    .clientName(client.getName())
+                    .ClientEmail(client.getUser().getEmail())
+                    .lines(resultSalesOrderLines)
+                    .createdAt(salesOrder.getCreatedAt())
+                    .status(salesOrder.getStatus())
+                    .totalPrice(totalPriceOrder)
                     .build();
 
-            linesToSave.add(line);
-            totalPriceOrder = totalPriceOrder.add(totalPrice);
-
-            if (line.getRemainingQuantityToReserve() > 0 && line.getRemainingQuantityToReserve() < lineFromRequest.getQuantity()) {
-                backOrderProducts.add(
-                        line.getProduct().getName()
-                                + " (Missing: " + line.getRemainingQuantityToReserve() + ")"
-                );
-            }
+        } catch (Exception e) {
+            MDC.put("error_code", "ORDER_PROCESSING_FAILED");
+            logger.error("Failed to process order", e);
+            throw e;
+        } finally {
+            MDC.clear();
         }
-
-
-        //this for save sales order
-        salesOrder = salesOrderRepository.save(salesOrder);
-        salesOrder.setLines(linesToSave);
-
-        //this for save sales Order line one by one
-        List<ResponseSalesOrderLineDto> resultSalesOrderLines = new ArrayList<>();
-        for (SalesOrderLine line : linesToSave) {
-            ResponseSalesOrderLineDto savedLine = salesOrderLineService.addOrderLine(line);
-            resultSalesOrderLines.add(savedLine);
-        }
-
-        Client client = clientService.getClientById(salesOrder.getClient().getId());
-
-        //message
-        String backOrderMessage = null;
-        if (!backOrderProducts.isEmpty()) {
-            backOrderMessage = "Some products could not be fully reserved: "
-                    + String.join(", ", backOrderProducts);
-        }
-
-        //this for return dto data
-        ResponceSalesOrderDto response = ResponceSalesOrderDto.builder()
-                .message(backOrderMessage)
-                .clientId(client.getId())
-                .clientName(client.getName())
-                .ClientEmail(client.getUser().getEmail())
-                .lines(resultSalesOrderLines)
-                .createdAt(salesOrder.getCreatedAt())
-                .status(salesOrder.getStatus())
-                .totalPrice(totalPriceOrder)
-                .build();
-
-        return response;
     }
 
     // SalesOrderService.java

@@ -27,6 +27,10 @@ public class InventoryService {
     private final  SalesOrderLineRepository salesOrderLineRepository;
     private final  SalesOrderRepository salesOrderRepository;
 
+    // GET ALL Inventory
+    public List<Inventory> getAllInventory() {
+        return inventoryRepository.findAll();
+    }
 
     // CREATE Inventory
     public ResponseInventoryDto createInventory(RequestInventoryDto dto) {

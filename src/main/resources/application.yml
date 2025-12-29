@@ -22,3 +22,9 @@ spring:
     livereload:
       enabled: true
     add-properties: true
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:dGhpcyBpcyBhIHZlcnkgc2VjdXJlIGFuZCBsb25nIHNlY3JldCBrZXkgZm9yIGp3dCB0b2tlbiBzaWduaW5nIHB1cnBvc2VzIGF0IGxlYXN0IDI1NiBiaXRz}
+  access-token-expiration: 900000   # 15 minutes in milliseconds
+  refresh-token-expiration: 604800000  # 7 days in milliseconds

@@ -9,6 +9,7 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Table(name = "roles")
 public class Role {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -16,11 +17,12 @@ public class Role {
     
     @Enumerated(EnumType.STRING)
     private RoleType name;
-    
+
     @ManyToMany(mappedBy = "roles")
+    @ToString.Exclude
     private Set<User> users;
 
-    enum RoleType {
+    public enum RoleType {
         ADMIN,
         WAREHOUSE_MANAGER,
         CLIENT

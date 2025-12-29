@@ -1,29 +1,51 @@
 package com.logitrack.logitrack.controller;
 
+import com.logitrack.logitrack.dto.Auth.AuthResponseDto;
+import com.logitrack.logitrack.dto.Auth.RefreshTokenRequestDto;
 import com.logitrack.logitrack.dto.Auth.RegisterDto;
 import com.logitrack.logitrack.dto.LoginRequest;
 import com.logitrack.logitrack.dto.ResClientDTO;
-import com.logitrack.logitrack.entity.User;
 import com.logitrack.logitrack.service.AuthService;
 import jakarta.validation.Valid;
-import jdk.jfr.Registered;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/auth")
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class AuthController {
 
-    private final AuthService authService;   // <-- لازم final
+    private final AuthService authService;
+
 
     @PostMapping("/login")
-    public User login(@RequestBody LoginRequest loginRequest){
-        return authService.login(loginRequest);
+    public ResponseEntity<AuthResponseDto> login(@RequestBody @Valid LoginRequest loginRequest) {
+        AuthResponseDto response = authService.login(loginRequest);
+        return ResponseEntity.ok(response);
     }
 
+
     @PostMapping("/register")
-    public ResClientDTO register(@RequestBody @Valid RegisterDto dto){
-        return authService.register(dto);
+    public ResponseEntity<ResClientDTO> register(@RequestBody @Valid RegisterDto dto) {
+        ResClientDTO response = authService.register(dto);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponseDto> refreshToken(@RequestBody @Valid RefreshTokenRequestDto request) {
+        AuthResponseDto response = authService.refreshToken(request);
+        return ResponseEntity.ok(response);
+    }
+
+
+    @PostMapping("/logout")
+    public ResponseEntity<Map<String, String>> logout(@RequestBody @Valid RefreshTokenRequestDto request) {
+        authService.logout(request.getRefreshToken());
+        return ResponseEntity.ok(Map.of("message", "Logout successful"));
     }
 }

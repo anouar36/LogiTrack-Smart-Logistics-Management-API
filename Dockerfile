@@ -2,7 +2,7 @@
 # Développement Dockerfile — live reload support
 # =====================================================
 
-FROM eclipse-temurin:17-jdk-alpine
+FROM eclipse-temurin:21-jdk-alpine
 
 # Définir dossier de travail
 WORKDIR /app

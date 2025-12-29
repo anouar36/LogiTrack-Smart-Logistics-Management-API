@@ -12,7 +12,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
@@ -45,12 +44,8 @@ class ProductServiceTest {
 
     private Product testProduct;
     private RequestDTO testRequestDTO;
-    private ResponseDTO testResponseDTO;
-
-    @BeforeEach
+    private ResponseDTO testResponseDTO;    @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this); // Very important
-
         testProduct = Product.builder()
                 .id(1L)
                 .sku("TEST-SKU-001")
@@ -104,30 +99,20 @@ class ProductServiceTest {
         assertTrue(result);
         assertFalse(testProduct.isActive());
         verify(productRepository).save(testProduct);
-    }
-
-    @Test
+    }    @Test
     void actionActiveProduct_WhenProductIsActiveButHasOrders_ShouldThrowException() {
         // Given
         testProduct.setActive(true);
         when(productRepository.findById(1L)).thenReturn(Optional.of(testProduct));
+        when(salesOrderService.checkStustOrderByProduct(testProduct)).thenReturn(true);
 
-        // Using lenient() here also
-        lenient().when(salesOrderService.checkStustOrderByProduct(testProduct)).thenReturn(true);
-
-        // NOTE:
-        // If this test fails, it means ProductService.java does NOT contain:
-        // if (check...) throw new RuntimeException(...)
-        //
-        // To avoid test failure temporarily, we use try/catch.
-        try {
-            productService.actionActiveProduct(1L);
-        } catch (RuntimeException e) {
-            assertEquals(
-                    "this product all ready in Order created or reserved or his hav Quentity",
-                    e.getMessage()
-            );
-        }
+        // When & Then
+        RuntimeException exception = assertThrows(RuntimeException.class, 
+                () -> productService.actionActiveProduct(1L));
+        assertEquals(
+                "this product all ready in Order created or reserved or his hav Quentity",
+                exception.getMessage()
+        );
     }
 
     // Add the rest of your CRUD tests here (get, update, delete…)
