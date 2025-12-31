@@ -108,6 +108,17 @@ services:
     networks:
       - logistics-net
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.1
+    container_name: keycloak
+    command: start-dev
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8083:8080"
+
+
   # --- Spring Boot App ---
   app:
     build: .
