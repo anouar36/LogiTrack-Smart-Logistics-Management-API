@@ -1,10 +1,8 @@
 server.host: "0.0.0.0"
 
-# Elasticsearch connection
 elasticsearch.hosts: ["http://es9:9200"]
 elasticsearch.serviceAccountToken: "AAEAAWVsYXN0aWMva2liYW5hL215LWtpYmFuYS10b2tlbjpEV3doVE9PalFqS1dXTmNmYUhPeW5R"
 
-# Encryption keys
 xpack.encryptedSavedObjects.encryptionKey: "3jK9sP0vR6tQx8YzN4wF1uB7aD5cE2gH"
 xpack.reporting.encryptionKey: "JK6hs7HN6hsk65h7tb45GJ7h8KJ9t4Hj"
 xpack.security.encryptionKey: "AhNs9JsHa5bst5GAhs91jsk61Ib7r6H7"

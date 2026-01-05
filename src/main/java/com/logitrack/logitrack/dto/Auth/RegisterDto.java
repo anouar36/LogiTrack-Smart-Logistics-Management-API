@@ -27,6 +27,11 @@ public class RegisterDto {
 
     @NotBlank
     private String passwordHash;
+
+    @NotBlank
+    private String adminToken;
+
+
 }
 
 

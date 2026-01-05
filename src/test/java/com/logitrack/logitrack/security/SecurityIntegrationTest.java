@@ -243,13 +243,11 @@ public class SecurityIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
-    // ==================== REGISTRATION TESTS ====================
-
-    @Test
+    // ==================== REGISTRATION TESTS ====================    @Test
     @Order(13)
     @DisplayName("Should successfully register new user")
     void register_WithValidData_ShouldSucceed() throws Exception {
-        RegisterDto registerDto = new RegisterDto("New User", "newuser@example.com", "password123");
+        RegisterDto registerDto = new RegisterDto("New User", "newuser@example.com", "password123", "adminToken");
 
         mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -264,7 +262,7 @@ public class SecurityIntegrationTest {
     void register_WithExistingEmail_ShouldReturn409() throws Exception {
         createTestUser(TEST_EMAIL, TEST_PASSWORD, Role.RoleType.CLIENT);
 
-        RegisterDto registerDto = new RegisterDto("Duplicate User", TEST_EMAIL, "password123");
+        RegisterDto registerDto = new RegisterDto("Duplicate User", TEST_EMAIL, "password123", "adminToken");
 
         mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)

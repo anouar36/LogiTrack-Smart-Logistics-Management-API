@@ -1,15 +1,15 @@
+server:
+  port: 8082
+
 spring:
+  application:
+    name: logitrack-backend
+
   datasource:
     driver-class-name: org.postgresql.Driver
-    # Use environment variables when available, otherwise default to localhost Postgres
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/digital_logistics}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/logistics}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD:anwar36flow}
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: http://localhost:8083/realms/logitrack-realm
+    password: ${SPRING_DATASOURCE_PASSWORD:root}
 
   jpa:
     hibernate:
@@ -19,17 +19,11 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
-  devtools:
-    restart:
-      enabled: true
-      additional-paths: src/main/java
-      exclude: static/**,public/**
-    livereload:
-      enabled: true
-    add-properties: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://keycloak:8080/realms/logitrack-realm
 
-# JWT Configuration
 jwt:
-  secret: ${JWT_SECRET:dGhpcyBpcyBhIHZlcnkgc2VjdXJlIGFuZCBsb25nIHNlY3JldCBrZXkgZm9yIGp3dCB0b2tlbiBzaWduaW5nIHB1cnBvc2VzIGF0IGxlYXN0IDI1NiBiaXRz}
-  access-token-expiration: 900000   # 15 minutes in milliseconds
-  refresh-token-expiration: 604800000  # 7 days in milliseconds
+  refresh-token-expiration: 604800000
