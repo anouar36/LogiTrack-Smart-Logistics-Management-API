@@ -24,7 +24,7 @@ public class AuthController {
     private final String KEYCLOAK_LOGOUT_URL = KEYCLOAK_BASE_URL + "/realms/logitrack-realm/protocol/openid-connect/logout";
 
     private final String CLIENT_ID = "logitrack-backend";
-    private final String CLIENT_SECRET = "Fjv2LcxbXeQPTNIbagQuBzzBinhHdXQi";
+    private final String CLIENT_SECRET = "OM7ltDYMn9CDlfx7SL800mbXl7lBwj6f";
 
     private final AuthService authService;
     private final RestTemplate restTemplate = new RestTemplate();

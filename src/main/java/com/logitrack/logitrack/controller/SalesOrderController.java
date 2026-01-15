@@ -16,6 +16,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api")
 @AllArgsConstructor
+@CrossOrigin(origins = "http://localhost:4200", allowCredentials = "true") // <--- أضف هذا السطر
 public class SalesOrderController {
     private final SalesOrderService salesOrderService;
 

@@ -25,8 +25,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final ClientRepository clientRepository;
     private final RoleRepository roleRepository;
-    // نحتفظ بـ PasswordEncoder فقط إذا أردنا حفظ الباسورد مشفراً في الداتابيس المحلية كاحتياط
-    // لكن تذكر: Keycloak هو المسؤول الأساسي عن التحقق من الباسورد الآن
+
     private final PasswordEncoder passwordEncoder;
 
     @Transactional

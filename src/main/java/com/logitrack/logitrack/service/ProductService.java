@@ -40,7 +40,7 @@ public class ProductService {
         // The logic, as in your code, saves only if the product exists.
         boolean productExists = productRepository.existsByNameAndSku(creatProductDTO.getName(), creatProductDTO.getSku());
 
-        if (productExists) {
+        if (!productExists) {
             Product product = productMapper.toEntity(creatProductDTO);
             Product savedProduct = productRepository.save(product);
             return productMapper.toDto(savedProduct);
