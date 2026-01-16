@@ -9,13 +9,14 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Warehouse {
-    @Id
+public class Warehouse {    @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
     private String code;
     private String name;
+    private String location;
+    private String description;
     
     @OneToMany(mappedBy = "warehouse", cascade = CascadeType.ALL)
     private List<Inventory> inventories;

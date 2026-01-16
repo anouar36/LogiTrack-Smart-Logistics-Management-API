@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Warehouse API Tester</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+        }
+
+        .api-section {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        }
+
+        .api-section h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .endpoint {
+            background: #f7fafc;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+
+        .endpoint-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .method {
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+
+        .method.post { background: #48bb78; color: white; }
+        .method.get { background: #4299e1; color: white; }
+        .method.put { background: #ed8936; color: white; }
+        .method.delete { background: #f56565; color: white; }
+
+        .endpoint-url {
+            font-family: 'Courier New', monospace;
+            color: #4a5568;
+            flex: 1;
+        }
+
+        .input-group {
+            margin-bottom: 10px;
+        }
+
+        .input-group label {
+            display: block;
+            color: #4a5568;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .input-group input,
+        .input-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e2e8f0;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .input-group textarea {
+            min-height: 100px;
+            font-size: 0.9rem;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+
+        .response {
+            background: #2d3748;
+            color: #68d391;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .response.show {
+            display: block;
+        }
+
+        .error {
+            color: #fc8181 !important;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .quick-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .quick-actions button {
+            background: #48bb78;
+        }
+
+        .quick-actions button:hover {
+            background: #38a169;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏢 Warehouse API Tester</h1>
+
+        <!-- Quick Actions -->
+        <div class="api-section">
+            <h2>Quick Actions</h2>
+            <div class="quick-actions">
+                <button onclick="testHealth()">Health Check</button>
+                <button onclick="getAllWarehouses()">Get All Warehouses</button>
+                <button onclick="getDashboard()">Get Dashboard</button>
+                <button onclick="getLowStockAlerts()">Get Alerts</button>
+                <button onclick="getTopWarehouses()">Get Top Warehouses</button>
+            </div>
+        </div>
+
+        <!-- Create Warehouse -->
+        <div class="api-section">
+            <h2>Create Warehouse</h2>
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method post">POST</span>
+                    <span class="endpoint-url">/api/warehouses</span>
+                </div>
+                <div class="input-group">
+                    <label>Request Body (JSON)</label>
+                    <textarea id="createBody">{
+  "code": "WH001",
+  "name": "Main Distribution Center",
+  "location": "New York, NY 10001",
+  "description": "Primary warehouse for East Coast operations"
+}</textarea>
+                </div>
+                <button onclick="createWarehouse()">Create Warehouse</button>
+                <div id="createResponse" class="response"></div>
+            </div>
+        </div>
+
+        <!-- Get Warehouse by ID -->
+        <div class="api-section">
+            <h2>Get Warehouse by ID</h2>
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method get">GET</span>
+                    <span class="endpoint-url">/api/warehouses/{id}</span>
+                </div>
+                <div class="input-group">
+                    <label>Warehouse ID</label>
+                    <input type="number" id="getWarehouseId" placeholder="Enter warehouse ID (e.g., 1)">
+                </div>
+                <button onclick="getWarehouseById()">Get Warehouse</button>
+                <div id="getWarehouseResponse" class="response"></div>
+            </div>
+        </div>
+
+        <!-- Update Warehouse -->
+        <div class="api-section">
+            <h2>Update Warehouse</h2>
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method put">PUT</span>
+                    <span class="endpoint-url">/api/warehouses/{id}</span>
+                </div>
+                <div class="input-group">
+                    <label>Warehouse ID</label>
+                    <input type="number" id="updateWarehouseId" placeholder="Enter warehouse ID">
+                </div>
+                <div class="input-group">
+                    <label>Request Body (JSON)</label>
+                    <textarea id="updateBody">{
+  "code": "WH001",
+  "name": "Main Distribution Center - Updated",
+  "location": "New York, NY 10001",
+  "description": "Updated description"
+}</textarea>
+                </div>
+                <button onclick="updateWarehouse()">Update Warehouse</button>
+                <div id="updateResponse" class="response"></div>
+            </div>
+        </div>
+
+        <!-- Search Warehouses -->
+        <div class="api-section">
+            <h2>Search Warehouses</h2>
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method get">GET</span>
+                    <span class="endpoint-url">/api/warehouses/search?name={name}</span>
+                </div>
+                <div class="input-group">
+                    <label>Search Term</label>
+                    <input type="text" id="searchTerm" placeholder="Enter warehouse name">
+                </div>
+                <button onclick="searchWarehouses()">Search</button>
+                <div id="searchResponse" class="response"></div>
+            </div>
+        </div>
+
+        <!-- Delete Warehouse -->
+        <div class="api-section">
+            <h2>Delete Warehouse</h2>
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method delete">DELETE</span>
+                    <span class="endpoint-url">/api/warehouses/{id}</span>
+                </div>
+                <div class="input-group">
+                    <label>Warehouse ID</label>
+                    <input type="number" id="deleteWarehouseId" placeholder="Enter warehouse ID">
+                </div>
+                <button onclick="deleteWarehouse()">Delete Warehouse</button>
+                <div id="deleteResponse" class="response"></div>
+            </div>
+        </div>
+
+        <!-- Dashboard Response -->
+        <div class="api-section">
+            <h2>API Responses</h2>
+            <div id="globalResponse" class="response"></div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://localhost:8080/api/warehouses';
+
+        function showResponse(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            element.textContent = JSON.stringify(data, null, 2);
+            element.classList.add('show');
+            if (isError) {
+                element.classList.add('error');
+            } else {
+                element.classList.remove('error');
+            }
+        }
+
+        async function testHealth() {
+            try {
+                const response = await fetch(`${BASE_URL}/health`);
+                const data = await response.text();
+                showResponse('globalResponse', { status: 'Success', message: data });
+            } catch (error) {
+                showResponse('globalResponse', { error: error.message }, true);
+            }
+        }
+
+        async function getAllWarehouses() {
+            try {
+                const response = await fetch(BASE_URL);
+                const data = await response.json();
+                showResponse('globalResponse', data);
+            } catch (error) {
+                showResponse('globalResponse', { error: error.message }, true);
+            }
+        }
+
+        async function getDashboard() {
+            try {
+                const response = await fetch(`${BASE_URL}/dashboard`);
+                const data = await response.json();
+                showResponse('globalResponse', data);
+            } catch (error) {
+                showResponse('globalResponse', { error: error.message }, true);
+            }
+        }
+
+        async function getLowStockAlerts() {
+            try {
+                const response = await fetch(`${BASE_URL}/alerts/low-stock`);
+                const data = await response.json();
+                showResponse('globalResponse', data);
+            } catch (error) {
+                showResponse('globalResponse', { error: error.message }, true);
+            }
+        }
+
+        async function getTopWarehouses() {
+            try {
+                const response = await fetch(`${BASE_URL}/top?limit=5`);
+                const data = await response.json();
+                showResponse('globalResponse', data);
+            } catch (error) {
+                showResponse('globalResponse', { error: error.message }, true);
+            }
+        }
+
+        async function createWarehouse() {
+            try {
+                const body = document.getElementById('createBody').value;
+                const response = await fetch(BASE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: body
+                });
+                const data = await response.json();
+                showResponse('createResponse', data, !response.ok);
+            } catch (error) {
+                showResponse('createResponse', { error: error.message }, true);
+            }
+        }
+
+        async function getWarehouseById() {
+            try {
+                const id = document.getElementById('getWarehouseId').value;
+                const response = await fetch(`${BASE_URL}/${id}`);
+                const data = await response.json();
+                showResponse('getWarehouseResponse', data, !response.ok);
+            } catch (error) {
+                showResponse('getWarehouseResponse', { error: error.message }, true);
+            }
+        }
+
+        async function updateWarehouse() {
+            try {
+                const id = document.getElementById('updateWarehouseId').value;
+                const body = document.getElementById('updateBody').value;
+                const response = await fetch(`${BASE_URL}/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: body
+                });
+                const data = await response.json();
+                showResponse('updateResponse', data, !response.ok);
+            } catch (error) {
+                showResponse('updateResponse', { error: error.message }, true);
+            }
+        }
+
+        async function searchWarehouses() {
+            try {
+                const term = document.getElementById('searchTerm').value;
+                const response = await fetch(`${BASE_URL}/search?name=${encodeURIComponent(term)}`);
+                const data = await response.json();
+                showResponse('searchResponse', data);
+            } catch (error) {
+                showResponse('searchResponse', { error: error.message }, true);
+            }
+        }
+
+        async function deleteWarehouse() {
+            try {
+                const id = document.getElementById('deleteWarehouseId').value;
+                if (!confirm(`Are you sure you want to delete warehouse ${id}?`)) return;
+                
+                const response = await fetch(`${BASE_URL}/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    showResponse('deleteResponse', { status: 'Success', message: 'Warehouse deleted' });
+                } else {
+                    const data = await response.json();
+                    showResponse('deleteResponse', data, true);
+                }
+            } catch (error) {
+                showResponse('deleteResponse', { error: error.message }, true);
+            }
+        }
+    </script>
+</body>
+</html>
